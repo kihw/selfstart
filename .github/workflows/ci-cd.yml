@@ -1,0 +1,288 @@
+name: SelfStart CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: kihw/selfstart
+
+jobs:
+  # Tests et validation du code
+  test:
+    runs-on: ubuntu-latest
+    name: 🧪 Tests & Validation
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🐳 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: 📝 Validate docker-compose
+      run: |
+        docker-compose config
+        docker-compose -f docker-compose.yml -f examples/docker-compose.apps.yml config
+
+    - name: 🔍 Lint Dockerfile
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: backend-api/Dockerfile
+
+    - name: 🔍 Lint Dockerfile Frontend
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: frontend-loader/Dockerfile
+
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: 📦 Install Python dependencies
+      run: |
+        cd backend-api
+        pip install -r requirements.txt
+        pip install pytest black flake8
+
+    - name: 🔍 Python code linting
+      run: |
+        cd backend-api
+        black --check .
+        flake8 . --max-line-length=88 --extend-ignore=E203
+
+    - name: 🟢 Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend-loader/package-lock.json
+
+    - name: 📦 Install Node.js dependencies
+      run: |
+        cd frontend-loader
+        npm ci
+
+    - name: 🔍 JavaScript/React linting
+      run: |
+        cd frontend-loader
+        npm run lint
+
+    - name: 🏗️ Build frontend
+      run: |
+        cd frontend-loader
+        npm run build
+
+  # Tests d'intégration avec Docker
+  integration-test:
+    runs-on: ubuntu-latest
+    name: 🔧 Integration Tests
+    needs: test
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🐳 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: 🚀 Create test environment
+      run: |
+        cp .env.example .env
+        sed -i 's/BASE_DOMAIN=exemple.com/BASE_DOMAIN=localhost/' .env
+
+    - name: 🏗️ Build and start services
+      run: |
+        docker-compose up -d --build
+        sleep 30
+
+    - name: 🏥 Health check API
+      run: |
+        curl -f http://localhost:8000/health || exit 1
+        curl -f http://localhost:8000/api/containers || exit 1
+
+    - name: 🏥 Health check Frontend
+      run: |
+        curl -f http://localhost:3000 || exit 1
+
+    - name: 📋 Show logs on failure
+      if: failure()
+      run: |
+        docker-compose logs
+
+    - name: 🧹 Cleanup
+      if: always()
+      run: |
+        docker-compose down -v
+
+  # Construction et publication des images Docker
+  build-and-push:
+    runs-on: ubuntu-latest
+    name: 🏗️ Build & Push Images
+    needs: [test, integration-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🐳 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: 🔐 Login to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 📝 Extract metadata
+      id: meta-backend
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: 📝 Extract metadata frontend
+      id: meta-frontend
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: 🏗️ Build and push backend
+      uses: docker/build-push-action@v5
+      with:
+        context: backend-api
+        push: true
+        tags: ${{ steps.meta-backend.outputs.tags }}
+        labels: ${{ steps.meta-backend.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: 🏗️ Build and push frontend
+      uses: docker/build-push-action@v5
+      with:
+        context: frontend-loader
+        push: true
+        tags: ${{ steps.meta-frontend.outputs.tags }}
+        labels: ${{ steps.meta-frontend.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Tests de sécurité
+  security-scan:
+    runs-on: ubuntu-latest
+    name: 🔒 Security Scan
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔒 Run Trivy vulnerability scanner - Backend
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest'
+        format: 'sarif'
+        output: 'trivy-backend.sarif'
+
+    - name: 🔒 Run Trivy vulnerability scanner - Frontend
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest'
+        format: 'sarif'
+        output: 'trivy-frontend.sarif'
+
+    - name: 📤 Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-backend.sarif'
+
+    - name: 📤 Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-frontend.sarif'
+
+  # Déploiement automatique (si configuré)
+  deploy:
+    runs-on: ubuntu-latest
+    name: 🚀 Deploy
+    needs: [build-and-push, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🚀 Deploy to production
+      run: |
+        echo "🚀 Deployment would happen here"
+        echo "This could be:"
+        echo "  - SSH to production server"
+        echo "  - Update docker-compose with new images"
+        echo "  - Rolling update with docker stack deploy"
+        echo "  - Kubernetes deployment"
+        echo "  - etc."
+        
+        # Exemple de déploiement SSH (décommentez et configurez selon vos besoins)
+        # - name: 🔐 Setup SSH
+        #   uses: webfactory/ssh-agent@v0.7.0
+        #   with:
+        #     ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        #
+        # - name: 🚀 Deploy via SSH
+        #   run: |
+        #     ssh -o StrictHostKeyChecking=no user@your-server.com << 'EOF'
+        #       cd /path/to/selfstart
+        #       git pull origin main
+        #       docker-compose pull
+        #       docker-compose up -d
+        #     EOF
+
+  # Notification du succès/échec
+  notify:
+    runs-on: ubuntu-latest
+    name: 📢 Notify
+    if: always()
+    needs: [test, integration-test, build-and-push, security-scan, deploy]
+
+    steps:
+    - name: 📢 Notify success
+      if: ${{ needs.test.result == 'success' && needs.integration-test.result == 'success' }}
+      run: |
+        echo "✅ SelfStart CI/CD completed successfully!"
+        echo "🎉 All tests passed and images built"
+
+    - name: 📢 Notify failure
+      if: ${{ needs.test.result == 'failure' || needs.integration-test.result == 'failure' }}
+      run: |
+        echo "❌ SelfStart CI/CD failed!"
+        echo "🔍 Check the logs for more details"
+
+    # Optionnel : notification Slack/Discord/Email
+    # - name: 📬 Slack notification
+    #   if: always()
+    #   uses: 8398a7/action-slack@v3
+    #   with:
+    #     status: ${{ job.status }}
+    #     channel: '#selfstart'
+    #     webhook_url: ${{ secrets.SLACK_WEBHOOK }}
