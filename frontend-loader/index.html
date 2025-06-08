@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SelfStart - Démarrage automatique</title>
+    
+    <!-- Preload des fonts pour améliorer les performances -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Meta tags pour le SEO et les réseaux sociaux -->
+    <meta name="description" content="Système de démarrage automatique de containers Docker via URLs dédiées">
+    <meta name="keywords" content="docker, containers, selfstart, automation">
+    <meta name="author" content="SelfStart Team">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="SelfStart - Démarrage automatique">
+    <meta property="og:description" content="Système de démarrage automatique de containers Docker via URLs dédiées">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="SelfStart - Démarrage automatique">
+    <meta property="twitter:description" content="Système de démarrage automatique de containers Docker via URLs dédiées">
+    
+    <!-- PWA Meta tags -->
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- Styles inline pour réduire le FOUC (Flash of Unstyled Content) -->
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(-45deg, #1a1a2e, #16213e, #0f3460, #533483);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      
+      #root {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      /* Loader de base en attendant le chargement de React */
+      .initial-loader {
+        color: white;
+        text-align: center;
+        font-size: 18px;
+      }
+      
+      .initial-loader-dots {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #60a5fa;
+        animation: spin 1s ease-in-out infinite;
+        margin-left: 10px;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Loader initial affiché pendant le chargement de React -->
+      <div class="initial-loader">
+        Chargement de SelfStart...
+        <div class="initial-loader-dots"></div>
+      </div>
+    </div>
+    
+    <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Scripts d'analytics ou de monitoring peuvent être ajoutés ici -->
+    <noscript>
+      <div style="color: white; text-align: center; padding: 20px;">
+        <h2>JavaScript requis</h2>
+        <p>Cette application nécessite JavaScript pour fonctionner correctement.</p>
+      </div>
+    </noscript>
+  </body>
+</html>
