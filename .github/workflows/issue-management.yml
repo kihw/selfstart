@@ -1,0 +1,325 @@
+name: 🤖 Issue & PR Management
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request:
+    types: [opened, labeled, ready_for_review]
+  issue_comment:
+    types: [created]
+
+jobs:
+  # Auto-labelling des issues
+  auto-label-issues:
+    runs-on: ubuntu-latest
+    name: 🏷️ Auto Label Issues
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🏷️ Auto label by content
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issueBody = context.payload.issue.body.toLowerCase();
+          const issueTitle = context.payload.issue.title.toLowerCase();
+          const labels = [];
+          
+          // Détection automatique des types
+          if (issueTitle.includes('bug') || issueBody.includes('bug') || issueBody.includes('erreur')) {
+            labels.push('bug');
+          }
+          
+          if (issueTitle.includes('feature') || issueBody.includes('feature') || issueBody.includes('fonctionnalité')) {
+            labels.push('enhancement');
+          }
+          
+          if (issueBody.includes('question') || issueTitle.includes('comment') || issueTitle.includes('how')) {
+            labels.push('question');
+          }
+          
+          if (issueBody.includes('documentation') || issueTitle.includes('doc')) {
+            labels.push('documentation');
+          }
+          
+          // Détection des composants
+          if (issueBody.includes('caddy') || issueBody.includes('proxy')) {
+            labels.push('caddy');
+          }
+          
+          if (issueBody.includes('react') || issueBody.includes('frontend') || issueBody.includes('interface')) {
+            labels.push('frontend');
+          }
+          
+          if (issueBody.includes('api') || issueBody.includes('fastapi') || issueBody.includes('backend')) {
+            labels.push('backend');
+          }
+          
+          if (issueBody.includes('docker') || issueBody.includes('container')) {
+            labels.push('docker');
+          }
+          
+          // Priorité
+          if (issueTitle.includes('urgent') || issueTitle.includes('critical')) {
+            labels.push('priority: high');
+          }
+          
+          if (labels.length > 0) {
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              labels: labels
+            });
+          }
+
+  # Message de bienvenue pour les nouvelles issues
+  welcome-issue:
+    runs-on: ubuntu-latest
+    name: 👋 Welcome New Issues
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    
+    steps:
+    - name: 👋 Comment welcome message
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const welcomeMessage = `👋 Merci d'avoir ouvert cette issue !
+          
+          **SelfStart Team** va examiner votre demande dans les plus brefs délais.
+          
+          📋 **Pour nous aider à mieux vous assister:**
+          - [ ] Vérifiez que votre issue n'existe pas déjà
+          - [ ] Fournissez des détails précis sur votre environnement
+          - [ ] Incluez les logs pertinents si c'est un bug
+          - [ ] Proposez une solution si vous en avez une
+          
+          🚀 **Liens utiles:**
+          - [📖 Documentation](https://github.com/kihw/selfstart#readme)
+          - [💬 Discussions](https://github.com/kihw/selfstart/discussions)
+          - [🐛 Signaler un bug](https://github.com/kihw/selfstart/issues/new?template=bug_report.md)
+          - [✨ Demander une fonctionnalité](https://github.com/kihw/selfstart/issues/new?template=feature_request.md)
+          
+          ⭐ **N'hésitez pas à star le repository si SelfStart vous aide !**`;
+          
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.payload.issue.number,
+            body: welcomeMessage
+          });
+
+  # Auto-labelling des PRs
+  auto-label-pr:
+    runs-on: ubuntu-latest
+    name: 🏷️ Auto Label PRs
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🏷️ Auto label by changes
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: files } = await github.rest.pulls.listFiles({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.payload.pull_request.number,
+          });
+          
+          const labels = [];
+          const fileNames = files.map(file => file.filename);
+          
+          // Détection par fichiers modifiés
+          if (fileNames.some(name => name.startsWith('frontend-loader/'))) {
+            labels.push('frontend');
+          }
+          
+          if (fileNames.some(name => name.startsWith('backend-api/'))) {
+            labels.push('backend');
+          }
+          
+          if (fileNames.some(name => name.includes('caddy') || name.includes('Caddyfile'))) {
+            labels.push('caddy');
+          }
+          
+          if (fileNames.some(name => name.includes('docker') || name.includes('Dockerfile'))) {
+            labels.push('docker');
+          }
+          
+          if (fileNames.some(name => name.includes('README') || name.includes('.md'))) {
+            labels.push('documentation');
+          }
+          
+          if (fileNames.some(name => name.includes('.github'))) {
+            labels.push('ci/cd');
+          }
+          
+          // Taille de la PR
+          const totalChanges = files.reduce((acc, file) => acc + file.changes, 0);
+          
+          if (totalChanges < 50) {
+            labels.push('size: small');
+          } else if (totalChanges < 200) {
+            labels.push('size: medium');
+          } else {
+            labels.push('size: large');
+          }
+          
+          if (labels.length > 0) {
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: labels
+            });
+          }
+
+  # Message de bienvenue pour les nouvelles PRs
+  welcome-pr:
+    runs-on: ubuntu-latest
+    name: 👋 Welcome New PRs
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    
+    steps:
+    - name: 👋 Comment welcome message
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const welcomeMessage = `🎉 Merci pour cette Pull Request !
+          
+          **Votre contribution à SelfStart est très appréciée** 🙏
+          
+          ✅ **Checklist avant review:**
+          - [ ] Les tests passent localement
+          - [ ] Le code respecte les standards du projet
+          - [ ] La documentation est mise à jour si nécessaire
+          - [ ] Les commits sont descriptifs
+          - [ ] Les changements sont testés
+          
+          🔄 **Prochaines étapes:**
+          1. **Vérification automatique** - Les tests CI/CD vont démarrer
+          2. **Review du code** - Un mainteneur va examiner votre PR
+          3. **Tests supplémentaires** - Nous testerons en profondeur
+          4. **Merge** - Si tout va bien, votre PR sera mergée !
+          
+          📝 **Tips pour une review rapide:**
+          - Décrivez clairement les changements effectués
+          - Expliquez pourquoi ces changements sont nécessaires
+          - Fournissez des captures d'écran si c'est une modification visuelle
+          - Ajoutez des tests si possible
+          
+          🚀 **Merci encore pour votre contribution à la communauté SelfStart !**`;
+          
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.payload.pull_request.number,
+            body: welcomeMessage
+          });
+
+  # Gestion des issues stale
+  stale-management:
+    runs-on: ubuntu-latest
+    name: 🧹 Stale Issues Management
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - name: 🧹 Mark stale issues
+      uses: actions/stale@v8
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        stale-issue-message: |
+          📅 Cette issue semble inactive depuis un moment.
+          
+          Pour garder le repository organisé, nous marquons automatiquement les issues inactives.
+          
+          **Si cette issue est toujours d'actualité:**
+          - Commentez pour la réactiver
+          - Ajoutez des informations supplémentaires
+          - Précisez si vous travaillez dessus
+          
+          **Sinon**, elle sera automatiquement fermée dans 7 jours.
+          
+          Merci de votre compréhension ! 🙏
+        
+        stale-pr-message: |
+          📅 Cette Pull Request semble inactive depuis un moment.
+          
+          **Pour éviter qu'elle soit fermée automatiquement:**
+          - Répondez aux commentaires de review
+          - Mettez à jour le code si nécessaire
+          - Confirmez que vous souhaitez continuer
+          
+          **Sinon**, elle sera fermée dans 7 jours pour garder le repository organisé.
+          
+          Merci ! 🚀
+        
+        days-before-stale: 30
+        days-before-close: 7
+        stale-issue-label: 'stale'
+        stale-pr-label: 'stale'
+        exempt-issue-labels: 'pinned,security,enhancement'
+        exempt-pr-labels: 'pinned,security'
+
+  # Réaction automatique aux mots-clés
+  auto-reactions:
+    runs-on: ubuntu-latest
+    name: 🎭 Auto Reactions
+    if: github.event_name == 'issue_comment'
+    
+    steps:
+    - name: 🎭 React to keywords
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const comment = context.payload.comment.body.toLowerCase();
+          
+          // Réactions positives
+          if (comment.includes('merci') || comment.includes('thank you') || comment.includes('parfait')) {
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'heart'
+            });
+          }
+          
+          // Réactions pour les bugs
+          if (comment.includes('bug') || comment.includes('erreur') || comment.includes('problème')) {
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+          }
+          
+          // Réactions pour les fonctionnalités
+          if (comment.includes('feature') || comment.includes('idée') || comment.includes('amélioration')) {
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket'
+            });
+          }
+          
+          // Réactions pour les questions
+          if (comment.includes('comment') || comment.includes('aide') || comment.includes('help')) {
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: '+1'
+            });
+          }
+
+# Programmation pour les tâches stale
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Tous les lundis à 9h UTC
