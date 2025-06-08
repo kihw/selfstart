@@ -1,0 +1,195 @@
+# Exemples d'applications à utiliser avec SelfStart
+# Ces containers sont configurés avec le profil "apps" pour un démarrage optionnel
+
+version: '3.8'
+
+services:
+  # Sonarr - Gestionnaire de séries TV
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    ports:
+      - "8989:8989"
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Europe/Paris}
+    volumes:
+      - sonarr_config:/config
+      - ${DOWNLOADS_PATH:-./downloads}:/downloads
+      - ${TV_PATH:-./tv}:/tv
+    networks:
+      - selfstart-network
+    profiles: ["apps"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.port=8989"
+      - "selfstart.name=sonarr"
+
+  # Radarr - Gestionnaire de films
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    ports:
+      - "7878:7878"
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Europe/Paris}
+    volumes:
+      - radarr_config:/config
+      - ${DOWNLOADS_PATH:-./downloads}:/downloads
+      - ${MOVIES_PATH:-./movies}:/movies
+    networks:
+      - selfstart-network
+    profiles: ["apps"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.port=7878"
+      - "selfstart.name=radarr"
+
+  # Jellyfin - Serveur multimédia
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Europe/Paris}
+    volumes:
+      - jellyfin_config:/config
+      - ${TV_PATH:-./tv}:/data/tvshows
+      - ${MOVIES_PATH:-./movies}:/data/movies
+    networks:
+      - selfstart-network
+    profiles: ["apps"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.port=8096"
+      - "selfstart.name=jellyfin"
+
+  # Bazarr - Gestionnaire de sous-titres
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    restart: unless-stopped
+    ports:
+      - "6767:6767"
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Europe/Paris}
+    volumes:
+      - bazarr_config:/config
+      - ${TV_PATH:-./tv}:/tv
+      - ${MOVIES_PATH:-./movies}:/movies
+    networks:
+      - selfstart-network
+    profiles: ["apps"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.port=6767"
+      - "selfstart.name=bazarr"
+
+  # Prowlarr - Indexeur de torrents
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    ports:
+      - "9696:9696"
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Europe/Paris}
+    volumes:
+      - prowlarr_config:/config
+    networks:
+      - selfstart-network
+    profiles: ["apps"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.port=9696"
+      - "selfstart.name=prowlarr"
+
+  # Plex - Serveur multimédia alternatif
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    restart: unless-stopped
+    ports:
+      - "32400:32400"
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Europe/Paris}
+      - VERSION=docker
+    volumes:
+      - plex_config:/config
+      - ${TV_PATH:-./tv}:/tv
+      - ${MOVIES_PATH:-./movies}:/movies
+    networks:
+      - selfstart-network
+    profiles: ["apps"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.port=32400"
+      - "selfstart.name=plex"
+
+  # Nextcloud - Cloud personnel
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      - NEXTCLOUD_ADMIN_USER=admin
+      - NEXTCLOUD_ADMIN_PASSWORD=changeme
+    volumes:
+      - nextcloud_data:/var/www/html
+    networks:
+      - selfstart-network
+    profiles: ["apps"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.port=8080"
+      - "selfstart.name=nextcloud"
+
+  # Portainer - Interface de gestion Docker
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - selfstart-network
+    profiles: ["apps"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.port=9000"
+      - "selfstart.name=portainer"
+
+volumes:
+  sonarr_config:
+  radarr_config:
+  jellyfin_config:
+  bazarr_config:
+  prowlarr_config:
+  plex_config:
+  nextcloud_data:
+  portainer_data:
+
+networks:
+  selfstart-network:
+    driver: bridge
+    external: true
