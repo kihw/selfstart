@@ -64,5 +64,5 @@ volumes:
 # Réseau pour la communication entre services
 networks:
   caddy_net:
-    driver: bridge
-    name: caddy_net
+    external: true
+
