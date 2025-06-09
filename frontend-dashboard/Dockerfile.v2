@@ -1,0 +1,53 @@
+# SelfStart Frontend Dashboard v2 - Enhanced Admin Interface
+FROM node:18-alpine
+
+# Métadonnées
+LABEL maintainer="SelfStart Team" 
+LABEL version="2.0.0"
+LABEL description="Enhanced admin dashboard with real-time monitoring and advanced features"
+
+# Variables d'environnement
+ENV NODE_ENV=production
+ENV NPM_CONFIG_LOGLEVEL=warn
+ENV NPM_CONFIG_PROGRESS=false
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Installer les dépendances système pour les builds optimisées
+RUN apk add --no-cache \
+    git \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/cache/apk/*
+
+# Copier les fichiers de configuration des dépendances
+COPY package*.json ./
+
+# Installer les dépendances avec optimisations
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# Copier le code source
+COPY . .
+
+# Build optimisé pour la production v2
+RUN npm run build && \
+    npm prune --production
+
+# Créer un utilisateur non-root
+RUN addgroup -g 1001 -S selfstart && \
+    adduser -S selfstart -u 1001 && \
+    chown -R selfstart:selfstart /app
+USER selfstart
+
+# Exposer le port
+EXPOSE 3000
+
+# Health check pour le dashboard v2
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+
+# Démarrer le serveur de prévisualisation optimisé
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
