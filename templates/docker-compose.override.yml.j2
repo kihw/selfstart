@@ -1,0 +1,53 @@
+# Docker Compose override généré automatiquement par SelfStart v0.3
+# Généré le {{ timestamp }}
+
+version: '3.8'
+
+services:
+{% for service in services %}
+  # Service découvert: {{ service.name }}
+  {{ service.name }}:
+    labels:
+      - "selfstart.discovered=true"
+      - "selfstart.type={{ service.type }}"
+      - "selfstart.status={{ service.status }}"
+      - "selfstart.version=0.3"
+      {% if service.auto_scale_enabled %}
+      - "selfstart.auto_scale=true"
+      - "selfstart.min_replicas={{ service.min_replicas }}"
+      - "selfstart.max_replicas={{ service.max_replicas }}"
+      {% endif %}
+      {% for key, value in service.labels.items() %}
+      - "{{ key }}={{ value }}"
+      {% endfor %}
+    networks:
+      - selfstart-network
+    {% if service.status == 'running' %}
+    restart: unless-stopped
+    {% endif %}
+    {% if service.environment %}
+    environment:
+      {% for key, value in service.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    {% endif %}
+
+{% endfor %}
+networks:
+  selfstart-network:
+    external: true
+
+# Variables d'environnement injectées
+x-environment-defaults: &default-env
+  TZ: {{ env.get('TZ', 'UTC') }}
+  PUID: {{ env.get('PUID', '1000') }}
+  PGID: {{ env.get('PGID', '1000') }}
+  SELFSTART_VERSION: "0.3.0"
+  SELFSTART_DOMAIN: {{ base_domain }}
+
+# Monitoring commun
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
