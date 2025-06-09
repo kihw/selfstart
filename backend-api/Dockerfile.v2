@@ -1,0 +1,60 @@
+# SelfStart Backend API v2 - Enhanced Architecture
+FROM python:3.11-slim
+
+# Métadonnées
+LABEL maintainer="SelfStart Team"
+LABEL version="0.3.0"
+LABEL description="Enhanced SelfStart Backend API with service discovery, auto-scaling, and plugins"
+
+# Variables d'environnement
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Installer les dépendances système requises pour v0.3
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    git \
+    gcc \
+    g++ \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    procps \
+    net-tools \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copier requirements et installer les dépendances Python
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Installer Celery pour les workers (nouveau dans v0.3)
+RUN pip install --no-cache-dir celery[redis]==5.3.4
+
+# Créer les répertoires nécessaires pour v0.3
+RUN mkdir -p /app/plugins /app/templates /app/data /app/config
+
+# Copier le code source
+COPY . .
+
+# Créer un utilisateur non-root pour la sécurité
+RUN useradd --create-home --shell /bin/bash selfstart && \
+    chown -R selfstart:selfstart /app
+USER selfstart
+
+# Exposer les ports
+EXPOSE 8000
+
+# Health check avancé pour v0.3
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Point d'entrée par défaut pour l'API v2
+CMD ["uvicorn", "main_v2:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
