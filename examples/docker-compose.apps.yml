@@ -191,5 +191,4 @@ volumes:
 
 networks:
   selfstart-network:
-    driver: bridge
     external: true
