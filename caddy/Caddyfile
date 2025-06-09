@@ -3,9 +3,6 @@
 
 # Configuration globale
 {
-    # Désactiver les logs admin pour la sécurité
-    admin off
-    
     # Configuration automatique HTTPS
     email admin@{$BASE_DOMAIN}
     
@@ -18,7 +15,7 @@
 # Route principale - Exemple avec Sonarr
 sonarr.{$BASE_DOMAIN} {
     # Matcher pour vérifier si le container est en cours d'exécution
-    @running `curl -sf http://backend-api:8000/api/status?name=sonarr | jq -r '.status' | grep -q running`
+    @running `curl -sf http://backend-api:8000/api/status?name=sonarr | grep -o '"status":"running"'`
     
     # Si le container est en cours d'exécution, rediriger vers lui
     handle @running {
@@ -55,7 +52,7 @@ sonarr.{$BASE_DOMAIN} {
 
 # Route pour Radarr
 radarr.{$BASE_DOMAIN} {
-    @running `curl -sf http://backend-api:8000/api/status?name=radarr | jq -r '.status' | grep -q running`
+    @running `curl -sf http://backend-api:8000/api/status?name=radarr | grep -o '"status":"running"'`
     
     handle @running {
         reverse_proxy radarr:7878 {
@@ -77,7 +74,7 @@ radarr.{$BASE_DOMAIN} {
 
 # Route pour Jellyfin
 jellyfin.{$BASE_DOMAIN} {
-    @running `curl -sf http://backend-api:8000/api/status?name=jellyfin | jq -r '.status' | grep -q running`
+    @running `curl -sf http://backend-api:8000/api/status?name=jellyfin | grep -o '"status":"running"'`
     
     handle @running {
         reverse_proxy jellyfin:8096 {
@@ -99,7 +96,7 @@ jellyfin.{$BASE_DOMAIN} {
 
 # Route pour Bazarr
 bazarr.{$BASE_DOMAIN} {
-    @running `curl -sf http://backend-api:8000/api/status?name=bazarr | jq -r '.status' | grep -q running`
+    @running `curl -sf http://backend-api:8000/api/status?name=bazarr | grep -o '"status":"running"'`
     
     handle @running {
         reverse_proxy bazarr:6767 {
@@ -121,7 +118,7 @@ bazarr.{$BASE_DOMAIN} {
 
 # Route pour Prowlarr
 prowlarr.{$BASE_DOMAIN} {
-    @running `curl -sf http://backend-api:8000/api/status?name=prowlarr | jq -r '.status' | grep -q running`
+    @running `curl -sf http://backend-api:8000/api/status?name=prowlarr | grep -o '"status":"running"'`
     
     handle @running {
         reverse_proxy prowlarr:9696 {
@@ -143,7 +140,7 @@ prowlarr.{$BASE_DOMAIN} {
 
 # Route pour Nextcloud
 nextcloud.{$BASE_DOMAIN} {
-    @running `curl -sf http://backend-api:8000/api/status?name=nextcloud | jq -r '.status' | grep -q running`
+    @running `curl -sf http://backend-api:8000/api/status?name=nextcloud | grep -o '"status":"running"'`
     
     handle @running {
         reverse_proxy nextcloud:80 {
@@ -165,7 +162,7 @@ nextcloud.{$BASE_DOMAIN} {
 
 # Route pour Portainer
 portainer.{$BASE_DOMAIN} {
-    @running `curl -sf http://backend-api:8000/api/status?name=portainer | jq -r '.status' | grep -q running`
+    @running `curl -sf http://backend-api:8000/api/status?name=portainer | grep -o '"status":"running"'`
     
     handle @running {
         reverse_proxy portainer:9000 {
@@ -187,7 +184,7 @@ portainer.{$BASE_DOMAIN} {
 
 # Route pour Plex (port spécial 32400)
 plex.{$BASE_DOMAIN} {
-    @running `curl -sf http://backend-api:8000/api/status?name=plex | jq -r '.status' | grep -q running`
+    @running `curl -sf http://backend-api:8000/api/status?name=plex | grep -o '"status":"running"'`
     
     handle @running {
         reverse_proxy plex:32400 {
@@ -220,15 +217,32 @@ localhost:8080 {
     }
 }
 
-# Interface d'administration SelfStart (optionnelle)
+# Interface d'administration SelfStart
 admin.{$BASE_DOMAIN} {
-    reverse_proxy frontend-loader:3000 {
+    reverse_proxy frontend-dashboard:3000 {
         header_up X-Admin-Mode true
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
     }
     
-    # Authentification basique (à personnaliser)
-    basicauth {
-        admin $2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNOWNvhHn.b6jCa7Jb.0Kfxh2
+    # Authentification basique (optionnelle)
+    @auth_enabled `test "${ENABLE_BASIC_AUTH:-false}" = "true"`
+    handle @auth_enabled {
+        basicauth {
+            {$ADMIN_USERNAME} {$ADMIN_PASSWORD_HASH}
+        }
+    }
+}
+
+# API directe (pour développement)
+api.{$BASE_DOMAIN} {
+    reverse_proxy backend-api:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
     }
 }
 
