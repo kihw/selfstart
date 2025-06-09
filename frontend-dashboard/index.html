@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SelfStart Dashboard</title>
+    
+    <!-- Preload des fonts pour améliorer les performances -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Meta tags pour le SEO et les réseaux sociaux -->
+    <meta name="description" content="Dashboard d'administration pour SelfStart - Gestion centralisée des containers Docker">
+    <meta name="keywords" content="docker, containers, selfstart, dashboard, automation, monitoring">
+    <meta name="author" content="SelfStart Team">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="SelfStart Dashboard">
+    <meta property="og:description" content="Dashboard d'administration pour SelfStart - Gestion centralisée des containers Docker">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="SelfStart Dashboard">
+    <meta property="twitter:description" content="Dashboard d'administration pour SelfStart - Gestion centralisée des containers Docker">
+    
+    <!-- PWA Meta tags -->
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <!-- Styles inline pour réduire le FOUC (Flash of Unstyled Content) -->
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #f9fafb;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      
+      #root {
+        min-height: 100vh;
+      }
+      
+      /* Loader de base en attendant le chargement de React */
+      .initial-loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #f9fafb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        color: #374151;
+        text-align: center;
+        font-size: 18px;
+        z-index: 9999;
+      }
+      
+      .initial-loader-dots {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(59, 130, 246, 0.3);
+        border-radius: 50%;
+        border-top-color: #3b82f6;
+        animation: spin 1s ease-in-out infinite;
+        margin-top: 16px;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      .logo {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        color: white;
+        font-weight: bold;
+        font-size: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <!-- Loader initial affiché pendant le chargement de React -->
+      <div class="initial-loader">
+        <div class="logo">S</div>
+        <div>Chargement du Dashboard SelfStart...</div>
+        <div class="initial-loader-dots"></div>
+      </div>
+    </div>
+    
+    <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Scripts d'analytics ou de monitoring peuvent être ajoutés ici -->
+    <noscript>
+      <div style="color: #374151; text-align: center; padding: 40px; background: #f9fafb; min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+        <h2 style="margin-bottom: 16px;">JavaScript requis</h2>
+        <p>Le Dashboard SelfStart nécessite JavaScript pour fonctionner correctement.</p>
+        <p>Veuillez activer JavaScript dans votre navigateur et recharger la page.</p>
+      </div>
+    </noscript>
+  </body>
+</html>
