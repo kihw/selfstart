@@ -1,0 +1,6 @@
+{
+  "port": 9090,
+  "enabled": true,
+  "metrics_prefix": "selfstart_",
+  "scrape_interval": 15
+}

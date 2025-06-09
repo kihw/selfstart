@@ -1,0 +1,14 @@
+{
+  "name": "prometheus-metrics",
+  "version": "1.0.0",
+  "description": "Export des métriques SelfStart vers Prometheus",
+  "author": "SelfStart Team",
+  "plugin_type": "monitoring",
+  "entry_point": "plugin.PrometheusMetricsPlugin",
+  "dependencies": ["prometheus_client>=0.19.0"],
+  "permissions": ["read_metrics", "network_access"],
+  "hooks": ["on_api_request", "on_service_discovery"],
+  "min_selfstart_version": "0.3.0",
+  "website": "https://github.com/kihw/selfstart",
+  "license": "MIT"
+}
