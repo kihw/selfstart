@@ -1,7 +1,7 @@
 # Makefile pour SelfStart
 # Simplifie les opérations courantes de développement et de déploiement
 
-.PHONY: help install start stop restart status logs clean build update apps
+.PHONY: help install start stop restart status logs clean build update apps network-test
 
 # Variables
 COMPOSE_FILE = docker-compose.yml
@@ -16,7 +16,7 @@ NC = \033[0m # No Color
 help: ## Affiche l'aide
 	@echo "$(GREEN)SelfStart - Commandes disponibles:$(NC)"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-15s$(NC) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 	@echo ""
 
 install: ## Installation initiale avec configuration automatique
@@ -71,6 +71,22 @@ apps-stop: ## Arrête les applications d'exemple
 	@echo "$(YELLOW)⏹️  Arrêt des applications d'exemple...$(NC)"
 	@docker-compose -f $(COMPOSE_FILE) -f $(APPS_COMPOSE_FILE) --profile apps down
 	@echo "$(GREEN)✅ Applications d'exemple arrêtées$(NC)"
+
+dashboard: ## Démarre le dashboard d'administration
+	@echo "$(GREEN)🎛️  Démarrage du dashboard...$(NC)"
+	@docker-compose --profile dashboard up -d
+	@echo "$(GREEN)✅ Dashboard disponible sur http://localhost:3001$(NC)"
+
+dashboard-build: ## Reconstruit le dashboard
+	@echo "$(GREEN)🔨 Construction du dashboard...$(NC)"
+	@docker-compose build frontend-dashboard
+	@echo "$(GREEN)✅ Dashboard reconstruit$(NC)"
+
+dashboard-logs: ## Affiche les logs du dashboard
+	@docker-compose logs -f frontend-dashboard
+
+dashboard-stop: ## Arrête le dashboard
+	@docker-compose --profile dashboard down
 
 clean: ## Nettoie les ressources Docker inutilisées
 	@echo "$(YELLOW)🧹 Nettoyage des ressources Docker...$(NC)"
@@ -130,6 +146,16 @@ network: ## Affiche les informations réseau
 	@echo ""
 	@docker network inspect selfstart-network | grep -E '"Name"|"IPv4Address"'
 
+network-test: ## Lance le diagnostic réseau complet
+	@echo "$(GREEN)🔍 Diagnostic réseau complet...$(NC)"
+	@chmod +x network-test.sh
+	@./network-test.sh
+
+network-create: ## Crée le réseau SelfStart
+	@echo "$(GREEN)🌐 Création du réseau SelfStart...$(NC)"
+	@docker network create selfstart-network 2>/dev/null || echo "Réseau déjà existant"
+	@echo "$(GREEN)✅ Réseau prêt$(NC)"
+
 volumes: ## Affiche les volumes Docker
 	@echo "$(GREEN)💽 Volumes Docker:$(NC)"
 	@docker volume ls | grep selfstart
@@ -162,6 +188,13 @@ ssl-cert: ## Génère des certificats SSL de test
 		-keyout ssl/selfstart.key -out ssl/selfstart.crt \
 		-subj "/C=FR/ST=State/L=City/O=SelfStart/CN=localhost"
 	@echo "$(GREEN)✅ Certificats générés dans ./ssl/$(NC)"
+
+# Raccourcis pour les développeurs
+quick-start: network-create start ## Démarrage rapide (réseau + services)
+
+full-start: network-create start apps dashboard ## Démarrage complet avec tout
+
+quick-test: start check-health network-test ## Test rapide après démarrage
 
 # Affichage par défaut
 .DEFAULT_GOAL := help
