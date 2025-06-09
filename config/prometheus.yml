@@ -1,0 +1,93 @@
+# Configuration Prometheus pour SelfStart v0.3
+# Monitoring et métriques pour l'écosystème complet
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'selfstart-monitoring'
+    environment: 'production'
+
+# Configuration des règles d'alerting
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+# Configuration Alertmanager
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Configuration des jobs de scraping
+scrape_configs:
+  # Monitoring de Prometheus lui-même
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # SelfStart Backend API v2
+  - job_name: 'selfstart-backend'
+    static_configs:
+      - targets: ['backend-api-v2:8000']
+    scrape_interval: 15s
+    metrics_path: /api/v2/metrics/prometheus
+    scrape_timeout: 10s
+
+  # Node Exporter pour les métriques système
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # cAdvisor pour les métriques containers
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Redis monitoring
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    # Note: Nécessite redis_exporter pour exposer les métriques
+
+  # PostgreSQL monitoring (si activé)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 60s
+    # Note: Nécessite postgres_exporter
+
+  # Caddy reverse proxy
+  - job_name: 'caddy'
+    static_configs:
+      - targets: ['caddy:2019']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # MinIO monitoring (si activé)
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+    scrape_interval: 60s
+    metrics_path: /minio/v2/metrics/cluster
+
+# Configuration du stockage des métriques
+storage:
+  tsdb:
+    path: /prometheus
+    retention.time: 15d
+    retention.size: 10GB
+    wal-compression: true
+
+# Configuration remote write (pour envoi vers services externes)
+# remote_write:
+#   - url: "https://your-remote-write-endpoint"
+#     basic_auth:
+#       username: "user"
+#       password: "password"
