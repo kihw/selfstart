@@ -54,6 +54,22 @@ services:
     depends_on:
       - backend-api
 
+  # Dashboard d'administration
+  frontend-dashboard:
+    build: ./frontend-dashboard
+    container_name: selfstart-dashboard
+    restart: unless-stopped
+    ports:
+      - "${DASHBOARD_PORT:-3001}:3000"
+    environment:
+      - VITE_API_URL=http://backend-api:8000
+      - VITE_POLLING_INTERVAL=${POLLING_INTERVAL:-2000}
+    networks:
+      - caddy_net
+    depends_on:
+      - backend-api
+    profiles: ["dashboard"]
+
 # Volumes pour la persistance des données
 volumes:
   caddy_data:
@@ -65,4 +81,3 @@ volumes:
 networks:
   caddy_net:
     external: true
-
