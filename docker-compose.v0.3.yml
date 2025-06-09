@@ -1,0 +1,485 @@
+# SelfStart v0.3 - Enhanced Docker Compose Configuration
+# Nouvelle architecture avec Redis, monitoring et tous les services avancés
+
+version: '3.8'
+
+services:
+  # =============================================
+  # INFRASTRUCTURE CORE
+  # =============================================
+  
+  # Caddy - Reverse Proxy avec HTTPS automatique
+  caddy:
+    image: caddy:2-alpine
+    container_name: selfstart-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy:/etc/caddy
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./templates/caddy:/templates  # Templates pour génération auto
+    environment:
+      - BASE_DOMAIN=${BASE_DOMAIN:-localhost}
+    networks:
+      - selfstart-network
+    depends_on:
+      - backend-api-v2
+      - frontend-loader
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=proxy"
+      - "selfstart.critical=true"
+
+  # Redis - Cache et communication inter-services
+  redis:
+    image: redis:7-alpine
+    container_name: selfstart-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/etc/redis/redis.conf:ro
+    command: redis-server /etc/redis/redis.conf
+    networks:
+      - selfstart-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=cache"
+      - "selfstart.critical=true"
+
+  # =============================================
+  # BACKEND SERVICES
+  # =============================================
+
+  # Backend API v2 - Nouvelle architecture avancée
+  backend-api-v2:
+    build: 
+      context: ./backend-api
+      dockerfile: Dockerfile.v2
+    container_name: selfstart-backend-v2
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./plugins:/app/plugins
+      - ./templates:/app/templates
+      - ./config:/app/config
+      - ./data:/app/data
+    environment:
+      - STARTUP_TIMEOUT=${STARTUP_TIMEOUT:-120}
+      - PYTHONUNBUFFERED=1
+      - REDIS_URL=redis://redis:6379
+      - API_VERSION=2.0
+      - ENABLE_SERVICE_DISCOVERY=true
+      - ENABLE_AUTO_SCALING=true
+      - ENABLE_PLUGINS=true
+      - ENABLE_TEMPLATES=true
+      - DEV_MODE=${DEV_MODE:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    networks:
+      - selfstart-network
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=api"
+      - "selfstart.critical=true"
+      - "selfstart.version=2.0"
+
+  # Worker pour tâches asynchrones
+  worker:
+    build: 
+      context: ./backend-api
+      dockerfile: Dockerfile.v2
+    container_name: selfstart-worker
+    restart: unless-stopped
+    command: celery -A main_v2 worker --loglevel=info
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./plugins:/app/plugins
+      - ./data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CELERY_BROKER=redis://redis:6379/1
+      - CELERY_BACKEND=redis://redis:6379/2
+    networks:
+      - selfstart-network
+    depends_on:
+      - redis
+      - backend-api-v2
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=worker"
+
+  # Scheduler pour tâches périodiques
+  scheduler:
+    build: 
+      context: ./backend-api
+      dockerfile: Dockerfile.v2
+    container_name: selfstart-scheduler
+    restart: unless-stopped
+    command: celery -A main_v2 beat --loglevel=info
+    volumes:
+      - ./data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CELERY_BROKER=redis://redis:6379/1
+    networks:
+      - selfstart-network
+    depends_on:
+      - redis
+      - backend-api-v2
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=scheduler"
+
+  # =============================================
+  # FRONTEND SERVICES  
+  # =============================================
+
+  # Frontend Loader - Interface de chargement
+  frontend-loader:
+    build: ./frontend-loader
+    container_name: selfstart-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - VITE_API_URL=http://backend-api-v2:8000
+      - VITE_WS_URL=ws://backend-api-v2:8000/ws
+      - VITE_POLLING_INTERVAL=${POLLING_INTERVAL:-2000}
+    networks:
+      - selfstart-network
+    depends_on:
+      - backend-api-v2
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=frontend"
+
+  # Dashboard d'administration v2
+  frontend-dashboard-v2:
+    build: 
+      context: ./frontend-dashboard
+      dockerfile: Dockerfile.v2
+    container_name: selfstart-dashboard-v2
+    restart: unless-stopped
+    ports:
+      - "${DASHBOARD_PORT:-3001}:3000"
+    environment:
+      - VITE_API_URL=http://backend-api-v2:8000
+      - VITE_WS_URL=ws://backend-api-v2:8000/ws
+      - VITE_POLLING_INTERVAL=${POLLING_INTERVAL:-2000}
+      - VITE_ENABLE_ADVANCED_FEATURES=true
+    networks:
+      - selfstart-network
+    depends_on:
+      - backend-api-v2
+    profiles: ["dashboard"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=dashboard"
+
+  # =============================================
+  # MONITORING STACK
+  # =============================================
+
+  # Prometheus - Collecte de métriques
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: selfstart-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - selfstart-network
+    profiles: ["monitoring"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=monitoring"
+
+  # Grafana - Dashboards de métriques
+  grafana:
+    image: grafana/grafana:latest
+    container_name: selfstart-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3002}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - selfstart-network
+    depends_on:
+      - prometheus
+    profiles: ["monitoring"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=monitoring"
+
+  # Node Exporter - Métriques système
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: selfstart-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - selfstart-network
+    profiles: ["monitoring"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=monitoring"
+
+  # cAdvisor - Métriques containers
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: selfstart-cadvisor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    networks:
+      - selfstart-network
+    profiles: ["monitoring"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=monitoring"
+
+  # =============================================
+  # DATA SERVICES
+  # =============================================
+
+  # PostgreSQL - Base de données principale (future)
+  postgres:
+    image: postgres:15-alpine
+    container_name: selfstart-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-selfstart}
+      - POSTGRES_USER=${POSTGRES_USER:-selfstart}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    networks:
+      - selfstart-network
+    profiles: ["database"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=database"
+
+  # MinIO - Stockage objet S3-compatible
+  minio:
+    image: minio/minio:latest
+    container_name: selfstart-minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=${MINIO_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    networks:
+      - selfstart-network
+    profiles: ["storage"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=storage"
+
+  # =============================================
+  # UTILITIES & TOOLS
+  # =============================================
+
+  # Watchtower - Mise à jour automatique des containers
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: selfstart-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=3600
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_CLEANUP=true
+    networks:
+      - selfstart-network
+    profiles: ["utilities"]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "selfstart.enable=true"
+      - "selfstart.type=utility"
+
+  # Dozzle - Viewer de logs en temps réel
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: selfstart-dozzle
+    restart: unless-stopped
+    ports:
+      - "${DOZZLE_PORT:-8888}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DOZZLE_LEVEL=info
+      - DOZZLE_TAILSIZE=300
+    networks:
+      - selfstart-network
+    profiles: ["utilities"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=utility"
+
+  # Portainer - Interface de gestion Docker
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: selfstart-portainer
+    restart: unless-stopped
+    ports:
+      - "${PORTAINER_PORT:-9000}:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - selfstart-network
+    profiles: ["utilities"]
+    labels:
+      - "selfstart.enable=true"
+      - "selfstart.type=utility"
+
+# =============================================
+# VOLUMES PERSISTANTS
+# =============================================
+
+volumes:
+  # Infrastructure
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+  redis_data:
+    driver: local
+  
+  # Monitoring
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  
+  # Base de données
+  postgres_data:
+    driver: local
+  
+  # Stockage
+  minio_data:
+    driver: local
+  
+  # Utilities
+  portainer_data:
+    driver: local
+
+# =============================================
+# RÉSEAUX
+# =============================================
+
+networks:
+  selfstart-network:
+    driver: bridge
+    name: selfstart-network
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+
+# =============================================
+# CONFIGURATION SECRETS (pour production)
+# =============================================
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt
+
+# =============================================
+# VARIABLES D'ENVIRONNEMENT PAR DEFAUT
+# =============================================
+
+x-default-env: &default-env
+  TZ: ${TZ:-Europe/Paris}
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+x-restart-policy: &restart-policy
+  restart_policy:
+    condition: unless-stopped
+    delay: 5s
+    max_attempts: 3
+    window: 120s
+
+# =============================================
+# HEALTHCHECKS PAR DEFAUT
+# =============================================
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
