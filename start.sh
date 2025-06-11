@@ -117,17 +117,138 @@ print_message "✓ Répertoires créés"
 
 # Créer le répertoire pour les logs Caddy
 print_info "Création du répertoire pour les logs Caddy..."
-if [ -w /var/log ]; then
-    mkdir -p /var/log/caddy
-    chmod -R 755 /var/log/caddy
-else
-    print_warning "Impossible de créer /var/log/caddy sans droits root"
-    print_info "Création d'un répertoire local pour les logs..."
-    mkdir -p ./logs/caddy
-    # Mise à jour du docker-compose.yml pour utiliser le répertoire local
-    sed -i 's|- /var/log/caddy:/var/log/caddy|- ./logs/caddy:/var/log/caddy|g' docker-compose.yml 2>/dev/null || true
-fi
+mkdir -p ./logs/caddy
 print_message "✓ Répertoire de logs créé"
+
+# Créer le répertoire caddy et le Caddyfile si nécessaire
+print_info "Configuration de Caddy..."
+mkdir -p ./caddy
+if [ ! -f ./caddy/Caddyfile ]; then
+    # Créer un Caddyfile de base
+    cat > ./caddy/Caddyfile << 'EOF'
+# Configuration Caddy pour SelfStart
+# Reverse proxy intelligent avec démarrage automatique de containers
+
+# Configuration globale
+{
+    # Configuration automatique HTTPS
+    email admin@{$BASE_DOMAIN}
+    
+    # Optimisations de performance
+    servers {
+        protocols h1 h2 h3
+    }
+}
+
+# Route principale - Exemple avec Sonarr
+sonarr.{$BASE_DOMAIN} {
+    # Matcher pour vérifier si le container est en cours d'exécution
+    @running `curl -sf http://backend-api:8000/api/status?name=sonarr | grep -o '"status":"running"'`
+    
+    # Si le container est en cours d'exécution, rediriger vers lui
+    handle @running {
+        reverse_proxy sonarr:8989 {
+            # Headers pour préserver l'IP client
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            
+            # Timeout augmenté pour les applications lentes
+            timeout 30s
+        }
+    }
+    
+    # Sinon, afficher l'interface de chargement
+    handle {
+        reverse_proxy frontend-loader:3000 {
+            header_up X-Container-Name sonarr
+            header_up X-Container-Port 8989
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # Logs pour debugging
+    log {
+        output file /var/log/caddy/sonarr.log
+        level INFO
+    }
+}
+
+# Dashboard d'administration
+admin.{$BASE_DOMAIN} {
+    reverse_proxy frontend-dashboard:3000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    
+    # Authentification basique (optionnelle)
+    @auth_enabled {
+        env ENABLE_BASIC_AUTH true
+    }
+    
+    handle @auth_enabled {
+        basicauth {
+            {$ADMIN_USERNAME} {$ADMIN_PASSWORD_HASH}
+        }
+    }
+    
+    log {
+        output file /var/log/caddy/admin.log
+        level INFO
+    }
+}
+
+# Configuration pour le développement local (localhost)
+localhost:8080 {
+    # API backend accessible directement
+    handle /api/* {
+        reverse_proxy backend-api:8000
+    }
+    
+    # Interface frontend
+    handle {
+        reverse_proxy frontend-loader:3000
+    }
+}
+
+# API directe (pour développement)
+api.{$BASE_DOMAIN} {
+    reverse_proxy backend-api:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    
+    log {
+        output file /var/log/caddy/api.log
+        level INFO
+    }
+}
+
+# Gestion des erreurs globales
+handle_errors {
+    @404 expression `{http.error.status_code} == 404`
+    handle @404 {
+        respond "Service non disponible - Vérifiez la configuration SelfStart" 404
+    }
+    
+    @500 expression `{http.error.status_code} >= 500`
+    handle @500 {
+        respond "Erreur serveur - Contactez l'administrateur" 500
+    }
+}
+EOF
+    print_message "✓ Caddyfile créé"
+else
+    print_message "✓ Caddyfile existant détecté"
+fi
 
 # Créer le réseau Docker
 print_info "Création du réseau Docker..."
@@ -177,8 +298,8 @@ domain=$(grep "BASE_DOMAIN=" .env | cut -d'=' -f2)
 if [ "$domain" = "localhost" ]; then
     echo "  Interface d'administration: http://localhost:8080"
     echo "  API Backend: http://localhost:8000"
-    echo "  Frontend: http://localhost:3000"
-    echo "  Dashboard: http://localhost:3001 (démarrer avec: make dashboard)"
+    echo "  Frontend: http://localhost:3001"
+    echo "  Dashboard: http://localhost:3002 (démarrer avec: make dashboard)"
 else
     echo "  Interface d'administration: https://admin.$domain"
     echo "  API Backend: https://api.$domain"
