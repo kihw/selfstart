@@ -178,3 +178,4 @@ handle_errors {
         respond "Erreur serveur - Contactez l'administrateur" 500
     }
 }
+}
