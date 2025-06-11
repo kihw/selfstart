@@ -1,0 +1,252 @@
+# Makefile Enhanced pour SelfStart
+# Commandes avancées pour l'orchestration et le load balancing
+
+.PHONY: help install start stop restart status logs clean build update
+
+# Variables
+COMPOSE_FILE = docker-compose.enhanced.yml
+APPS_COMPOSE_FILE = examples/docker-compose.apps.yml
+PROJECT_NAME = selfstart-enhanced
+
+# Couleurs pour les messages
+GREEN = \033[0;32m
+YELLOW = \033[1;33m
+BLUE = \033[0;34m
+RED = \033[0;31m
+NC = \033[0m # No Color
+
+help: ## Affiche l'aide Enhanced
+	@echo "$(GREEN)SelfStart Enhanced - Commandes disponibles:$(NC)"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-25s$(NC) %s\n", $$1, $$2}'
+	@echo ""
+	@echo "$(BLUE)Profils disponibles:$(NC)"
+	@echo "  ha          - High Availability (instances multiples)"
+	@echo "  monitoring  - Prometheus + Grafana"
+	@echo "  dashboard   - Interface d'administration"
+	@echo "  apps        - Applications d'exemple"
+
+install-enhanced: ## Installation Enhanced avec orchestration
+	@echo "$(GREEN)🚀 Installation SelfStart Enhanced...$(NC)"
+	@chmod +x start.sh
+	@./start.sh
+	@echo "$(GREEN)✅ Installation Enhanced terminée$(NC)"
+
+start-enhanced: ## Démarre SelfStart Enhanced
+	@echo "$(GREEN)▶️  Démarrage SelfStart Enhanced...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) up -d
+	@echo "$(GREEN)✅ SelfStart Enhanced démarré$(NC)"
+
+start-ha: ## Démarre en mode High Availability
+	@echo "$(GREEN)🔄 Démarrage en mode High Availability...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) --profile ha up -d
+	@echo "$(GREEN)✅ Mode HA activé$(NC)"
+
+start-full: ## Démarre avec tous les profils
+	@echo "$(GREEN)🚀 Démarrage complet (HA + Monitoring + Dashboard + Apps)...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) -f $(APPS_COMPOSE_FILE) \
+		--profile ha --profile monitoring --profile dashboard --profile apps up -d
+	@echo "$(GREEN)✅ Démarrage complet terminé$(NC)"
+
+stop-enhanced: ## Arrête SelfStart Enhanced
+	@echo "$(YELLOW)⏹️  Arrêt SelfStart Enhanced...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) down
+	@echo "$(GREEN)✅ SelfStart Enhanced arrêté$(NC)"
+
+restart-enhanced: ## Redémarre SelfStart Enhanced
+	@echo "$(YELLOW)🔄 Redémarrage SelfStart Enhanced...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) restart
+	@echo "$(GREEN)✅ SelfStart Enhanced redémarré$(NC)"
+
+status-enhanced: ## Affiche l'état Enhanced
+	@echo "$(GREEN)📊 État SelfStart Enhanced:$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) ps
+
+logs-enhanced: ## Affiche les logs Enhanced
+	@echo "$(GREEN)📋 Logs SelfStart Enhanced (Ctrl+C pour quitter):$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) logs -f
+
+build-enhanced: ## Reconstruit les images Enhanced
+	@echo "$(GREEN)🔨 Construction des images Enhanced...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) build --no-cache
+	@echo "$(GREEN)✅ Images Enhanced construites$(NC)"
+
+# ===============================
+# ORCHESTRATION
+# ===============================
+
+orchestrator-status: ## Statut de l'orchestrateur
+	@echo "$(GREEN)🎭 Statut de l'orchestrateur:$(NC)"
+	@curl -s http://localhost:8000/api/v2/containers | jq '.metrics'
+
+orchestrator-metrics: ## Métriques de l'orchestrateur
+	@echo "$(GREEN)📊 Métriques de l'orchestrateur:$(NC)"
+	@curl -s http://localhost:8000/api/v2/metrics | jq '.orchestrator'
+
+create-container: ## Crée un nouveau container (usage: make create-container NAME=myapp IMAGE=nginx:latest)
+	@echo "$(GREEN)📦 Création du container $(NAME)...$(NC)"
+	@curl -X POST http://localhost:8000/api/v2/containers \
+		-H "Content-Type: application/json" \
+		-d '{"name":"$(NAME)","image":"$(IMAGE)","ports":{"80":8080}}'
+
+start-container: ## Démarre un container (usage: make start-container NAME=myapp)
+	@echo "$(GREEN)▶️  Démarrage du container $(NAME)...$(NC)"
+	@curl -X POST http://localhost:8000/api/v2/containers/$(NAME)/start
+
+stop-container: ## Arrête un container (usage: make stop-container NAME=myapp)
+	@echo "$(YELLOW)⏹️  Arrêt du container $(NAME)...$(NC)"
+	@curl -X POST http://localhost:8000/api/v2/containers/$(NAME)/stop
+
+container-logs: ## Logs d'un container (usage: make container-logs NAME=myapp)
+	@echo "$(GREEN)📋 Logs du container $(NAME):$(NC)"
+	@curl -s http://localhost:8000/api/v2/containers/$(NAME)/logs | jq -r '.logs'
+
+# ===============================
+# PROXY MANAGEMENT
+# ===============================
+
+proxy-status: ## Statut du proxy manager
+	@echo "$(GREEN)🔀 Statut du proxy:$(NC)"
+	@curl -s http://localhost:8000/api/v2/proxy/targets | jq '.metrics'
+
+proxy-targets: ## Liste les targets de proxy
+	@echo "$(GREEN)🎯 Targets de proxy:$(NC)"
+	@curl -s http://localhost:8000/api/v2/proxy/targets | jq '.targets'
+
+create-proxy-target: ## Crée un target de proxy (usage: make create-proxy-target NAME=myapp HOST=localhost PORT=8080)
+	@echo "$(GREEN)🎯 Création du target $(NAME)...$(NC)"
+	@curl -X POST http://localhost:8000/api/v2/proxy/targets \
+		-H "Content-Type: application/json" \
+		-d '{"name":"$(NAME)","backends":[{"host":"$(HOST)","port":$(PORT)}],"rule":"round_robin"}'
+
+add-backend: ## Ajoute un backend (usage: make add-backend TARGET=myapp HOST=localhost PORT=8081)
+	@echo "$(GREEN)➕ Ajout du backend $(HOST):$(PORT) au target $(TARGET)...$(NC)"
+	@curl -X POST http://localhost:8000/api/v2/proxy/targets/$(TARGET)/backends \
+		-H "Content-Type: application/json" \
+		-d '{"host":"$(HOST)","port":$(PORT),"weight":1}'
+
+remove-backend: ## Retire un backend (usage: make remove-backend TARGET=myapp URL=http://localhost:8081)
+	@echo "$(YELLOW)➖ Suppression du backend $(URL) du target $(TARGET)...$(NC)"
+	@curl -X DELETE "http://localhost:8000/api/v2/proxy/targets/$(TARGET)/backends?backend_url=$(URL)"
+
+backend-maintenance: ## Met un backend en maintenance (usage: make backend-maintenance TARGET=myapp URL=http://localhost:8081 MODE=true)
+	@echo "$(YELLOW)🔧 Maintenance du backend $(URL): $(MODE)...$(NC)"
+	@curl -X POST "http://localhost:8000/api/v2/proxy/targets/$(TARGET)/backends/maintenance?backend_url=$(URL)&maintenance=$(MODE)"
+
+# ===============================
+# MONITORING
+# ===============================
+
+start-monitoring: ## Démarre le stack de monitoring
+	@echo "$(GREEN)📊 Démarrage du monitoring...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) --profile monitoring up -d
+	@echo "$(GREEN)✅ Monitoring disponible:$(NC)"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Grafana: http://localhost:3002 (admin/admin)"
+
+metrics: ## Affiche toutes les métriques
+	@echo "$(GREEN)📊 Métriques système:$(NC)"
+	@curl -s http://localhost:8000/api/v2/metrics | jq '.'
+
+prometheus-metrics: ## Métriques format Prometheus
+	@echo "$(GREEN)📊 Métriques Prometheus:$(NC)"
+	@curl -s http://localhost:8000/metrics
+
+health-check-all: ## Vérifie la santé de tous les services
+	@echo "$(GREEN)🏥 Vérification de santé globale:$(NC)"
+	@echo "Backend Enhanced:"
+	@curl -f http://localhost:8000/health 2>/dev/null && echo "  ✅ Backend OK" || echo "  ❌ Backend KO"
+	@echo "Frontend:"
+	@curl -f http://localhost:3000 2>/dev/null && echo "  ✅ Frontend OK" || echo "  ❌ Frontend KO"
+	@echo "Redis:"
+	@docker-compose -f $(COMPOSE_FILE) exec -T redis redis-cli ping 2>/dev/null && echo "  ✅ Redis OK" || echo "  ❌ Redis KO"
+
+# ===============================
+# LOAD BALANCING
+# ===============================
+
+start-loadbalancer: ## Démarre HAProxy
+	@echo "$(GREEN)⚖️  Démarrage du load balancer...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) --profile loadbalancer up -d
+	@echo "$(GREEN)✅ HAProxy disponible sur http://localhost:8080$(NC)"
+	@echo "  Stats: http://localhost:8404/stats"
+
+haproxy-stats: ## Affiche les stats HAProxy
+	@echo "$(GREEN)📊 Stats HAProxy:$(NC)"
+	@curl -s http://localhost:8404/stats
+
+test-load-balancing: ## Test le load balancing
+	@echo "$(GREEN)🧪 Test du load balancing...$(NC)"
+	@for i in {1..10}; do \
+		echo "Requête $$i:"; \
+		curl -s http://localhost:8080/health | jq -r '.service'; \
+		sleep 1; \
+	done
+
+# ===============================
+# DÉVELOPPEMENT
+# ===============================
+
+dev-enhanced: ## Mode développement Enhanced
+	@echo "$(GREEN)🛠️  Mode développement Enhanced...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) -f docker-compose.dev.yml up --build
+
+test-enhanced: ## Lance les tests Enhanced
+	@echo "$(GREEN)🧪 Tests Enhanced...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) exec backend-api-enhanced python -m pytest tests/ -v
+
+benchmark: ## Benchmark de performance
+	@echo "$(GREEN)⚡ Benchmark de performance...$(NC)"
+	@echo "Test de charge sur l'API:"
+	@ab -n 1000 -c 10 http://localhost:8000/health
+	@echo "Test de charge sur le proxy:"
+	@ab -n 1000 -c 10 http://localhost:8080/health
+
+# ===============================
+# MAINTENANCE
+# ===============================
+
+backup-enhanced: ## Sauvegarde Enhanced
+	@echo "$(GREEN)💾 Sauvegarde Enhanced...$(NC)"
+	@mkdir -p backups/enhanced
+	@docker run --rm -v selfstart-enhanced_redis_data:/data -v $(PWD)/backups/enhanced:/backup alpine tar czf /backup/redis_$(shell date +%Y%m%d_%H%M%S).tar.gz -C /data .
+	@docker run --rm -v selfstart-enhanced_prometheus_data:/data -v $(PWD)/backups/enhanced:/backup alpine tar czf /backup/prometheus_$(shell date +%Y%m%d_%H%M%S).tar.gz -C /data .
+	@cp .env backups/enhanced/env_$(shell date +%Y%m%d_%H%M%S).backup 2>/dev/null || true
+	@echo "$(GREEN)✅ Sauvegarde Enhanced terminée$(NC)"
+
+clean-enhanced: ## Nettoyage Enhanced
+	@echo "$(YELLOW)🧹 Nettoyage Enhanced...$(NC)"
+	@docker-compose -f $(COMPOSE_FILE) down -v --remove-orphans
+	@docker system prune -f
+	@echo "$(GREEN)✅ Nettoyage Enhanced terminé$(NC)"
+
+update-enhanced: ## Mise à jour Enhanced
+	@echo "$(GREEN)📥 Mise à jour Enhanced...$(NC)"
+	@git pull
+	@docker-compose -f $(COMPOSE_FILE) down
+	@docker-compose -f $(COMPOSE_FILE) build --no-cache
+	@docker-compose -f $(COMPOSE_FILE) up -d
+	@echo "$(GREEN)✅ Mise à jour Enhanced terminée$(NC)"
+
+# ===============================
+# UTILITAIRES
+# ===============================
+
+shell-backend: ## Shell dans le backend Enhanced
+	@docker-compose -f $(COMPOSE_FILE) exec backend-api-enhanced /bin/bash
+
+shell-redis: ## Shell dans Redis
+	@docker-compose -f $(COMPOSE_FILE) exec redis redis-cli
+
+network-info: ## Informations réseau Enhanced
+	@echo "$(GREEN)🌐 Informations réseau Enhanced:$(NC)"
+	@docker network inspect selfstart-network | jq '.[0].Containers'
+
+api-docs: ## Documentation API Enhanced
+	@echo "$(GREEN)📚 Documentation API Enhanced:$(NC)"
+	@echo "  Swagger UI: http://localhost:8000/docs"
+	@echo "  ReDoc: http://localhost:8000/redoc"
+	@echo "  API v2: http://localhost:8000/api/v2/"
+
+# Affichage par défaut
+.DEFAULT_GOAL := help

@@ -1,0 +1,252 @@
+# Configuration Caddy Enhanced pour SelfStart
+# Proxy intelligent avec load balancing et health checks
+
+# Configuration globale
+{
+    admin off
+    email admin@{$BASE_DOMAIN}
+    
+    servers {
+        protocols h1 h2 h3
+    }
+    
+    # Modules pour le load balancing
+    order reverse_proxy before respond
+}
+
+# API Backend avec load balancing
+api.{$BASE_DOMAIN} {
+    # Health check pour le backend
+    @backend_healthy `curl -sf http://backend-api:8000/health`
+    
+    handle @backend_healthy {
+        reverse_proxy {
+            # Load balancing entre plusieurs instances
+            to backend-api:8000
+            to backend-api-2:8000  # Instance secondaire si disponible
+            
+            # Health checks
+            health_uri /health
+            health_interval 30s
+            health_timeout 5s
+            
+            # Load balancing policy
+            lb_policy least_conn
+            
+            # Headers
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            
+            # Timeouts
+            timeout 30s
+        }
+    }
+    
+    handle {
+        respond "API Backend unavailable" 503
+    }
+    
+    log {
+        output file /var/log/caddy/api.log
+        level INFO
+    }
+}
+
+# Frontend avec failover
+{$BASE_DOMAIN} {
+    @frontend_healthy `curl -sf http://frontend-loader:3000`
+    
+    handle @frontend_healthy {
+        reverse_proxy {
+            to frontend-loader:3000
+            to frontend-loader-2:3000  # Instance de backup
+            
+            health_uri /
+            health_interval 30s
+            
+            lb_policy round_robin
+            
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    handle {
+        respond "Frontend unavailable" 503
+    }
+}
+
+# Applications avec démarrage intelligent
+*.{$BASE_DOMAIN} {
+    # Extraire le nom du service depuis le sous-domaine
+    @app_name expression `{labels.1}`
+    
+    # Vérifier si l'application est en cours d'exécution
+    @app_running `curl -sf http://backend-api:8000/api/v2/containers/{labels.1}/status | grep -o '"state":"running"'`
+    
+    # Si l'app tourne, router vers elle
+    handle @app_running {
+        # Utiliser le proxy manager pour le load balancing
+        reverse_proxy /proxy/app/{labels.1}/* {
+            to backend-api:8000
+            
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Container-Name {labels.1}
+        }
+    }
+    
+    # Sinon, démarrer l'app et afficher l'interface de chargement
+    handle {
+        # Déclencher le démarrage
+        @start_trigger `curl -sf -X POST http://backend-api:8000/api/v2/containers/{labels.1}/start`
+        
+        # Afficher l'interface de chargement
+        reverse_proxy frontend-loader:3000 {
+            header_up X-Container-Name {labels.1}
+            header_up X-Startup-Mode true
+        }
+    }
+    
+    log {
+        output file /var/log/caddy/{labels.1}.log
+        level INFO
+    }
+}
+
+# Dashboard d'administration avec authentification
+admin.{$BASE_DOMAIN} {
+    # Authentification basique si activée
+    @auth_enabled `test "${ENABLE_BASIC_AUTH:-false}" = "true"`
+    handle @auth_enabled {
+        basicauth {
+            {$ADMIN_USERNAME} {$ADMIN_PASSWORD_HASH}
+        }
+    }
+    
+    reverse_proxy frontend-dashboard:3001 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Admin-Mode true
+    }
+    
+    log {
+        output file /var/log/caddy/admin.log
+        level INFO
+    }
+}
+
+# Métriques et monitoring
+metrics.{$BASE_DOMAIN} {
+    # Restriction d'accès aux métriques
+    @internal_network remote_ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+    
+    handle @internal_network {
+        reverse_proxy backend-api:8000/api/v2/metrics {
+            header_up Host {host}
+        }
+    }
+    
+    handle {
+        respond "Access denied" 403
+    }
+}
+
+# WebSocket support pour les mises à jour temps réel
+ws.{$BASE_DOMAIN} {
+    reverse_proxy backend-api:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        
+        # WebSocket specific headers
+        header_up Upgrade {>Upgrade}
+        header_up Connection {>Connection}
+    }
+}
+
+# Configuration pour le développement local
+localhost:8080 {
+    # API directe
+    handle /api/* {
+        reverse_proxy backend-api:8000
+    }
+    
+    # Dashboard
+    handle /admin/* {
+        reverse_proxy frontend-dashboard:3001
+    }
+    
+    # Frontend par défaut
+    handle {
+        reverse_proxy frontend-loader:3000
+    }
+}
+
+# Gestion des erreurs globales avec pages personnalisées
+handle_errors {
+    @404 expression `{http.error.status_code} == 404`
+    handle @404 {
+        rewrite * /error/404.html
+        reverse_proxy frontend-loader:3000
+    }
+    
+    @502 expression `{http.error.status_code} == 502`
+    handle @502 {
+        rewrite * /error/502.html
+        reverse_proxy frontend-loader:3000
+    }
+    
+    @503 expression `{http.error.status_code} == 503`
+    handle @503 {
+        rewrite * /error/503.html
+        reverse_proxy frontend-loader:3000
+    }
+}
+
+# Rate limiting global
+(rate_limit) {
+    rate_limit {
+        zone dynamic {
+            key {remote_host}
+            events 100
+            window 1m
+        }
+    }
+}
+
+# Sécurité headers
+(security_headers) {
+    header {
+        # Security headers
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        
+        # Remove server info
+        -Server
+        -X-Powered-By
+    }
+}
+
+# Appliquer la sécurité et rate limiting à tous les sites
+*.{$BASE_DOMAIN} {
+    import rate_limit
+    import security_headers
+}
+
+{$BASE_DOMAIN} {
+    import rate_limit
+    import security_headers
+}
