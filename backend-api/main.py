@@ -7,6 +7,7 @@ import os
 from docker_manager import DockerManager
 from typing import Optional
 import logging
+from caddy_api import router as caddy_router
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +31,9 @@ app.add_middleware(
 
 # Initialisation du gestionnaire Docker
 docker_manager = DockerManager()
+
+# Inclure le router Caddy
+app.include_router(caddy_router)
 
 # Modèles Pydantic
 class ContainerResponse(BaseModel):

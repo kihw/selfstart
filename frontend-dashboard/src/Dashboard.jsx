@@ -3,6 +3,7 @@ import { Server, Bell, Settings, LogOut } from 'lucide-react';
 import Navigation from './components/Navigation';
 import Overview from './components/Overview';
 import Containers from './components/Containers';
+import CaddyManager from './components/CaddyManager';
 import Monitoring from './components/Monitoring';
 import Automation from './components/Automation';
 import Webhooks from './components/Webhooks';
@@ -50,6 +51,8 @@ const Dashboard = () => {
             setShowContainerModal(true);
           }}
         />;
+      case 'caddy':
+        return <CaddyManager />;
       case 'monitoring':
         return <Monitoring 
           systemMetrics={systemMetrics}
