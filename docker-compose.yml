@@ -8,7 +8,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
       - ./logs/caddy:/var/log/caddy
@@ -36,7 +36,7 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./data:/app/data
     environment:
       - STARTUP_TIMEOUT=${STARTUP_TIMEOUT:-120}
