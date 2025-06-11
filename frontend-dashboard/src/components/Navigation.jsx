@@ -1,10 +1,11 @@
 import React from 'react';
-import { Home, Container, Activity, Zap, Webhook, Settings } from 'lucide-react';
+import { Home, Container, Activity, Zap, Webhook, Settings, Globe } from 'lucide-react';
 
 const Navigation = ({ activeTab, setActiveTab }) => {
   const tabs = [
     { id: 'overview', label: 'Vue d\'ensemble', icon: Home },
     { id: 'containers', label: 'Containers', icon: Container },
+    { id: 'caddy', label: 'Proxy Caddy', icon: Globe },
     { id: 'monitoring', label: 'Monitoring', icon: Activity },
     { id: 'automation', label: 'Automation', icon: Zap },
     { id: 'webhooks', label: 'Webhooks', icon: Webhook },
