@@ -10,8 +10,11 @@ PROJECT_NAME = selfstart
 
 # Couleurs pour les messages
 GREEN = \033[0;32m
+]
 YELLOW = \033[1;33m
+]
 NC = \033[0m # No Color
+]
 
 # Fonction pour détecter Docker Compose
 DOCKER_COMPOSE_CMD := $(shell \
@@ -38,7 +41,7 @@ check-docker-compose:
 help: ## Affiche l'aide
 	@echo "$(GREEN)SelfStart - Commandes disponibles:$(NC)"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$\' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 	@echo ""
 
 install: ## Installation initiale avec configuration automatique
