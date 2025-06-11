@@ -68,6 +68,10 @@ radarr.{$BASE_DOMAIN} {
         reverse_proxy frontend-loader:3000 {
             header_up X-Container-Name radarr
             header_up X-Container-Port 7878
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
 }
@@ -90,6 +94,10 @@ jellyfin.{$BASE_DOMAIN} {
         reverse_proxy frontend-loader:3000 {
             header_up X-Container-Name jellyfin
             header_up X-Container-Port 8096
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
 }
@@ -112,6 +120,10 @@ bazarr.{$BASE_DOMAIN} {
         reverse_proxy frontend-loader:3000 {
             header_up X-Container-Name bazarr
             header_up X-Container-Port 6767
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
 }
@@ -134,6 +146,10 @@ prowlarr.{$BASE_DOMAIN} {
         reverse_proxy frontend-loader:3000 {
             header_up X-Container-Name prowlarr
             header_up X-Container-Port 9696
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
 }
@@ -156,6 +172,10 @@ nextcloud.{$BASE_DOMAIN} {
         reverse_proxy frontend-loader:3000 {
             header_up X-Container-Name nextcloud
             header_up X-Container-Port 8080
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
 }
@@ -178,6 +198,10 @@ portainer.{$BASE_DOMAIN} {
         reverse_proxy frontend-loader:3000 {
             header_up X-Container-Name portainer
             header_up X-Container-Port 9000
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
 }
@@ -200,7 +224,38 @@ plex.{$BASE_DOMAIN} {
         reverse_proxy frontend-loader:3000 {
             header_up X-Container-Name plex
             header_up X-Container-Port 32400
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
         }
+    }
+}
+
+# Dashboard d'administration
+admin.{$BASE_DOMAIN} {
+    reverse_proxy frontend-dashboard:3000 {
+        header_up X-Admin-Mode true
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    
+    # Authentification basique (optionnelle)
+    @auth_enabled {
+        expression {$ENABLE_BASIC_AUTH} == "true"
+    }
+    
+    handle @auth_enabled {
+        basicauth {
+            {$ADMIN_USERNAME} {$ADMIN_PASSWORD_HASH}
+        }
+    }
+    
+    log {
+        output file /var/log/caddy/admin.log
+        level INFO
     }
 }
 
@@ -214,25 +269,6 @@ localhost:8080 {
     # Interface frontend
     handle {
         reverse_proxy frontend-loader:3000
-    }
-}
-
-# Interface d'administration SelfStart
-admin.{$BASE_DOMAIN} {
-    reverse_proxy frontend-dashboard:3000 {
-        header_up X-Admin-Mode true
-        header_up Host {host}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
-    
-    # Authentification basique (optionnelle)
-    @auth_enabled `test "${ENABLE_BASIC_AUTH:-false}" = "true"`
-    handle @auth_enabled {
-        basicauth {
-            {$ADMIN_USERNAME} {$ADMIN_PASSWORD_HASH}
-        }
     }
 }
 
