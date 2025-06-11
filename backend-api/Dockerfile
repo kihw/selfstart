@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copier le code source
 COPY . .
 
+# Créer les répertoires de données
+RUN mkdir -p /app/data
+
 # Créer un utilisateur non-root pour la sécurité
 RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app
 USER app

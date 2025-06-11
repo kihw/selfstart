@@ -11,8 +11,12 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+      - /var/log/caddy:/var/log/caddy
     environment:
       - BASE_DOMAIN=${BASE_DOMAIN:-localhost}
+      - ENABLE_BASIC_AUTH=${ENABLE_BASIC_AUTH:-false}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
     networks:
       - selfstart-network
     depends_on:
@@ -33,9 +37,11 @@ services:
       - "${API_PORT:-8000}:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data:/app/data
     environment:
       - STARTUP_TIMEOUT=${STARTUP_TIMEOUT:-120}
       - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     networks:
       - selfstart-network
     healthcheck:

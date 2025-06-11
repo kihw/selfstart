@@ -10,7 +10,9 @@ import logging
 from caddy_api import router as caddy_router
 
 # Configuration du logging
-logging.basicConfig(level=logging.INFO)
+logging_level = os.getenv("LOG_LEVEL", "INFO").upper()
+numeric_level = getattr(logging, logging_level, logging.INFO)
+logging.basicConfig(level=numeric_level, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Initialisation de l'application FastAPI

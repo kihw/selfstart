@@ -92,8 +92,15 @@ fi
 
 # Créer les répertoires nécessaires
 print_info "Création des répertoires de données..."
-mkdir -p downloads media/tv media/movies media/music config
+mkdir -p downloads media/tv media/movies media/music config data
+chmod -R 777 data
 print_message "✓ Répertoires créés"
+
+# Créer le répertoire pour les logs Caddy
+print_info "Création du répertoire pour les logs Caddy..."
+mkdir -p /var/log/caddy
+chmod -R 777 /var/log/caddy 2>/dev/null || sudo mkdir -p /var/log/caddy && sudo chmod -R 777 /var/log/caddy
+print_message "✓ Répertoire de logs créé"
 
 # Créer le réseau Docker
 print_info "Création du réseau Docker..."
@@ -126,6 +133,11 @@ else
     exit 1
 fi
 
+# Rendre le script de test réseau exécutable
+print_info "Configuration du script de diagnostic réseau..."
+chmod +x network-test.sh
+print_message "✓ Script network-test.sh prêt"
+
 # Afficher les informations de connexion
 echo
 print_message "🎉 SelfStart est maintenant opérationnel!"
@@ -139,9 +151,10 @@ if [ "$domain" = "localhost" ]; then
     echo "  Interface d'administration: http://localhost:8080"
     echo "  API Backend: http://localhost:8000"
     echo "  Frontend: http://localhost:3000"
+    echo "  Dashboard: http://localhost:3001 (démarrer avec: make dashboard)"
 else
     echo "  Interface d'administration: https://admin.$domain"
-    echo "  API Backend: http://$domain:8000"
+    echo "  API Backend: https://api.$domain"
     echo "  Exemples d'applications:"
     echo "    - Sonarr: https://sonarr.$domain"
     echo "    - Radarr: https://radarr.$domain"
@@ -154,10 +167,15 @@ echo "  Voir les logs:           docker-compose logs -f"
 echo "  Arrêter les services:    docker-compose down"
 echo "  Redémarrer:              docker-compose restart"
 echo "  Mettre à jour:           git pull && docker-compose up -d --build"
+echo "  Tester le réseau:        ./network-test.sh"
 
 echo
 print_info "Pour démarrer des applications d'exemple:"
 echo "  docker-compose -f docker-compose.yml -f examples/docker-compose.apps.yml --profile apps up -d"
+
+echo
+print_info "Pour démarrer le dashboard d'administration:"
+echo "  docker-compose --profile dashboard up -d"
 
 echo
 print_warning "Notes importantes:"
