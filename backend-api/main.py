@@ -4,9 +4,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import asyncio
 import os
+import logging
 from docker_manager import DockerManager
 from typing import Optional
-import logging
 from caddy_api import router as caddy_router
 
 # Configuration du logging

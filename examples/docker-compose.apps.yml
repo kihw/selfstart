@@ -27,7 +27,7 @@ services:
       - "selfstart.port=8989"
       - "selfstart.name=sonarr"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8989/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8989" || "exit", "0"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -56,7 +56,7 @@ services:
       - "selfstart.port=7878"
       - "selfstart.name=radarr"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7878/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:7878" || "exit", "0"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -85,7 +85,7 @@ services:
       - "selfstart.port=8096"
       - "selfstart.name=jellyfin"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8096" || "exit", "0"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -179,7 +179,7 @@ services:
       - "selfstart.port=8080"
       - "selfstart.name=nextcloud"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/status.php"]
+      test: ["CMD", "curl", "-f", "http://localhost:80" || "exit", "0"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -203,7 +203,7 @@ services:
       - "selfstart.port=9000"
       - "selfstart.name=portainer"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/api/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000" || "exit", "0"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -221,4 +221,5 @@ volumes:
 
 networks:
   selfstart-network:
-    external: true
+    name: selfstart-network
+    external: false

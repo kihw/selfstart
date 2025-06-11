@@ -74,6 +74,11 @@ radarr.{$BASE_DOMAIN} {
             header_up X-Forwarded-Proto {scheme}
         }
     }
+    
+    log {
+        output file /var/log/caddy/radarr.log
+        level INFO
+    }
 }
 
 # Route pour Jellyfin
@@ -99,6 +104,11 @@ jellyfin.{$BASE_DOMAIN} {
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
         }
+    }
+    
+    log {
+        output file /var/log/caddy/jellyfin.log
+        level INFO
     }
 }
 
@@ -126,6 +136,11 @@ bazarr.{$BASE_DOMAIN} {
             header_up X-Forwarded-Proto {scheme}
         }
     }
+    
+    log {
+        output file /var/log/caddy/bazarr.log
+        level INFO
+    }
 }
 
 # Route pour Prowlarr
@@ -151,6 +166,11 @@ prowlarr.{$BASE_DOMAIN} {
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
         }
+    }
+    
+    log {
+        output file /var/log/caddy/prowlarr.log
+        level INFO
     }
 }
 
@@ -178,6 +198,11 @@ nextcloud.{$BASE_DOMAIN} {
             header_up X-Forwarded-Proto {scheme}
         }
     }
+    
+    log {
+        output file /var/log/caddy/nextcloud.log
+        level INFO
+    }
 }
 
 # Route pour Portainer
@@ -203,6 +228,11 @@ portainer.{$BASE_DOMAIN} {
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
         }
+    }
+    
+    log {
+        output file /var/log/caddy/portainer.log
+        level INFO
     }
 }
 
@@ -230,12 +260,16 @@ plex.{$BASE_DOMAIN} {
             header_up X-Forwarded-Proto {scheme}
         }
     }
+    
+    log {
+        output file /var/log/caddy/plex.log
+        level INFO
+    }
 }
 
 # Dashboard d'administration
 admin.{$BASE_DOMAIN} {
     reverse_proxy frontend-dashboard:3000 {
-        header_up X-Admin-Mode true
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
@@ -244,7 +278,7 @@ admin.{$BASE_DOMAIN} {
     
     # Authentification basique (optionnelle)
     @auth_enabled {
-        expression {$ENABLE_BASIC_AUTH} == "true"
+        env ENABLE_BASIC_AUTH true
     }
     
     handle @auth_enabled {
@@ -280,6 +314,11 @@ api.{$BASE_DOMAIN} {
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
     }
+    
+    log {
+        output file /var/log/caddy/api.log
+        level INFO
+    }
 }
 
 # Gestion des erreurs globales
@@ -293,5 +332,4 @@ handle_errors {
     handle @500 {
         respond "Erreur serveur - Contactez l'administrateur" 500
     }
-}
 }

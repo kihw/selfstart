@@ -93,13 +93,23 @@ fi
 # Créer les répertoires nécessaires
 print_info "Création des répertoires de données..."
 mkdir -p downloads media/tv media/movies media/music config data
-chmod -R 777 data
+# Permissions plus restrictives pour data
+mkdir -p data
+chmod -R 755 data
 print_message "✓ Répertoires créés"
 
 # Créer le répertoire pour les logs Caddy
 print_info "Création du répertoire pour les logs Caddy..."
-mkdir -p /var/log/caddy
-chmod -R 777 /var/log/caddy 2>/dev/null || sudo mkdir -p /var/log/caddy && sudo chmod -R 777 /var/log/caddy
+if [ -w /var/log ]; then
+    mkdir -p /var/log/caddy
+    chmod -R 755 /var/log/caddy
+else
+    print_warning "Impossible de créer /var/log/caddy sans droits root"
+    print_info "Création d'un répertoire local pour les logs..."
+    mkdir -p ./logs/caddy
+    # Mise à jour du docker-compose.yml pour utiliser le répertoire local
+    sed -i 's|- /var/log/caddy:/var/log/caddy|- ./logs/caddy:/var/log/caddy|g' docker-compose.yml 2>/dev/null || true
+fi
 print_message "✓ Répertoire de logs créé"
 
 # Créer le réseau Docker

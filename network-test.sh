@@ -27,7 +27,7 @@ print_success "Docker accessible"
 echo -e "\n${BLUE}🌐 Vérification du réseau${NC}"
 if ! docker network ls | grep -q "selfstart-network"; then
     print_warning "Réseau selfstart-network manquant, création..."
-    docker network create selfstart-network
+    docker network create --subnet=172.20.0.0/16 selfstart-network
     if [ $? -eq 0 ]; then
         print_success "Réseau selfstart-network créé"
     else
@@ -146,9 +146,22 @@ if docker ps | grep -q "selfstart-dashboard"; then
     fi
 else
     print_info "Dashboard non démarré (profil optionnel)"
+    print_info "Pour démarrer le dashboard: docker-compose --profile dashboard up -d"
 fi
 
-# 11. Résumé et recommandations
+# 11. Vérification des permissions
+echo -e "\n${BLUE}🔒 Vérification des permissions${NC}"
+if [ ! -w /var/run/docker.sock ]; then
+    print_warning "Permissions insuffisantes sur /var/run/docker.sock"
+    print_info "Solution: sudo chmod 666 /var/run/docker.sock"
+fi
+
+if [ -d "./logs/caddy" ] && [ ! -w "./logs/caddy" ]; then
+    print_warning "Permissions insuffisantes sur ./logs/caddy"
+    print_info "Solution: chmod -R 755 ./logs/caddy"
+fi
+
+# 12. Résumé et recommandations
 echo -e "\n${BLUE}📋 Résumé${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
@@ -173,6 +186,7 @@ echo "  make logs            # Voir les logs"
 echo "  make status          # État des services"
 echo "  make restart         # Redémarrer"
 echo "  make apps            # Démarrer avec exemples"
+echo "  make dashboard       # Démarrer le dashboard"
 
 # Troubleshooting
 echo -e "\n${BLUE}🔧 En cas de problème:${NC}"
@@ -180,5 +194,6 @@ echo "  1. Vérifier les logs: docker-compose logs"
 echo "  2. Redémarrer:        docker-compose restart"
 echo "  3. Nettoyer:          docker-compose down && docker-compose up -d"
 echo "  4. Rebuild:           docker-compose build --no-cache"
+echo "  5. Permissions:       sudo chmod 666 /var/run/docker.sock"
 
 echo -e "\n${GREEN}✅ Diagnostic terminé!${NC}"

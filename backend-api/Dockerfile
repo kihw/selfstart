@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Créer les répertoires de données
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chmod 755 /app/data
 
 # Créer un utilisateur non-root pour la sécurité
 RUN useradd --create-home --shell /bin/bash app && chown -R app:app /app
@@ -29,7 +29,7 @@ USER app
 EXPOSE 8000
 
 # Health check pour Docker
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Commande de démarrage

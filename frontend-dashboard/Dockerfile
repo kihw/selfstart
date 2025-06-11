@@ -18,6 +18,10 @@ COPY . .
 # Build de l'application
 RUN npm run build
 
+# Configuration de l'URL API pour la production
+ENV VITE_API_URL=http://backend-api:8000
+ENV VITE_POLLING_INTERVAL=2000
+
 # Créer un utilisateur non-root
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001
