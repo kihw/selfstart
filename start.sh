@@ -29,6 +29,17 @@ print_info() {
     echo -e "${BLUE}[SelfStart]${NC} $1"
 }
 
+# Fonction pour détecter la commande Docker Compose disponible
+detect_docker_compose() {
+    if command -v docker-compose &> /dev/null; then
+        echo "docker-compose"
+    elif docker compose version &> /dev/null 2>&1; then
+        echo "docker compose"
+    else
+        return 1
+    fi
+}
+
 # Banner
 echo -e "${BLUE}"
 echo "  ____       _  __   ____  _             _   "
@@ -50,11 +61,17 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Vérifier Docker Compose
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    print_error "Docker Compose n'est pas installé. Veuillez installer Docker Compose d'abord."
+# Vérifier Docker Compose et détecter la commande
+if ! DOCKER_COMPOSE_CMD=$(detect_docker_compose); then
+    print_error "Docker Compose n'est pas installé ou n'est pas accessible."
+    print_info "Pour installer Docker Compose:"
+    print_info "  - Ubuntu/Debian: sudo apt-get install docker-compose-plugin"
+    print_info "  - RHEL/CentOS: sudo yum install docker-compose-plugin"
+    print_info "  - Ou suivez la documentation officielle Docker"
     exit 1
 fi
+
+print_message "✓ Docker et Docker Compose sont disponibles (utilisation de: $DOCKER_COMPOSE_CMD)"
 
 # Vérifier que Docker fonctionne
 if ! docker ps &> /dev/null; then
@@ -64,7 +81,7 @@ if ! docker ps &> /dev/null; then
     exit 1
 fi
 
-print_message "✓ Docker et Docker Compose sont disponibles"
+print_message "✓ Docker fonctionne correctement"
 
 # Configuration du fichier .env
 if [ ! -f .env ]; then
@@ -123,11 +140,11 @@ fi
 
 # Arrêter les services existants
 print_info "Arrêt des services existants..."
-docker-compose down 2>/dev/null || true
+$DOCKER_COMPOSE_CMD down 2>/dev/null || true
 
 # Construire et démarrer les services
 print_info "Construction et démarrage des services SelfStart..."
-docker-compose up -d --build
+$DOCKER_COMPOSE_CMD up -d --build
 
 # Attendre que les services soient prêts
 print_info "Attente du démarrage des services..."
@@ -136,10 +153,10 @@ sleep 10
 # Vérifier l'état des services
 print_info "Vérification de l'état des services..."
 
-if docker-compose ps | grep -q "Up"; then
+if $DOCKER_COMPOSE_CMD ps | grep -q "Up"; then
     print_message "✓ Services SelfStart démarrés avec succès!"
 else
-    print_error "Certains services ont échoué. Vérifiez les logs avec: docker-compose logs"
+    print_error "Certains services ont échoué. Vérifiez les logs avec: $DOCKER_COMPOSE_CMD logs"
     exit 1
 fi
 
@@ -173,19 +190,19 @@ fi
 
 echo
 print_info "Commandes utiles:"
-echo "  Voir les logs:           docker-compose logs -f"
-echo "  Arrêter les services:    docker-compose down"
-echo "  Redémarrer:              docker-compose restart"
-echo "  Mettre à jour:           git pull && docker-compose up -d --build"
+echo "  Voir les logs:           $DOCKER_COMPOSE_CMD logs -f"
+echo "  Arrêter les services:    $DOCKER_COMPOSE_CMD down"
+echo "  Redémarrer:              $DOCKER_COMPOSE_CMD restart"
+echo "  Mettre à jour:           git pull && $DOCKER_COMPOSE_CMD up -d --build"
 echo "  Tester le réseau:        ./network-test.sh"
 
 echo
 print_info "Pour démarrer des applications d'exemple:"
-echo "  docker-compose -f docker-compose.yml -f examples/docker-compose.apps.yml --profile apps up -d"
+echo "  $DOCKER_COMPOSE_CMD -f docker-compose.yml -f examples/docker-compose.apps.yml --profile apps up -d"
 
 echo
 print_info "Pour démarrer le dashboard d'administration:"
-echo "  docker-compose --profile dashboard up -d"
+echo "  $DOCKER_COMPOSE_CMD --profile dashboard up -d"
 
 echo
 print_warning "Notes importantes:"

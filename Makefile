@@ -13,6 +13,28 @@ GREEN = \033[0;32m
 YELLOW = \033[1;33m
 NC = \033[0m # No Color
 
+# Fonction pour détecter Docker Compose
+DOCKER_COMPOSE_CMD := $(shell \
+	if command -v docker-compose >/dev/null 2>&1; then \
+		echo "docker-compose"; \
+	elif docker compose version >/dev/null 2>&1; then \
+		echo "docker compose"; \
+	else \
+		echo ""; \
+	fi \
+)
+
+# Vérifier que Docker Compose est disponible
+check-docker-compose:
+	@if [ -z "$(DOCKER_COMPOSE_CMD)" ]; then \
+		echo "$(YELLOW)❌ Docker Compose n'est pas disponible$(NC)"; \
+		echo "$(YELLOW)Pour installer Docker Compose:$(NC)"; \
+		echo "  - Ubuntu/Debian: sudo apt-get install docker-compose-plugin"; \
+		echo "  - RHEL/CentOS: sudo yum install docker-compose-plugin"; \
+		echo "  - Ou suivez la documentation officielle Docker"; \
+		exit 1; \
+	fi
+
 help: ## Affiche l'aide
 	@echo "$(GREEN)SelfStart - Commandes disponibles:$(NC)"
 	@echo ""
@@ -24,69 +46,69 @@ install: ## Installation initiale avec configuration automatique
 	@chmod +x start.sh
 	@./start.sh
 
-start: ## Démarre tous les services SelfStart
+start: check-docker-compose ## Démarre tous les services SelfStart
 	@echo "$(GREEN)▶️  Démarrage des services SelfStart...$(NC)"
-	@docker-compose up -d
+	@$(DOCKER_COMPOSE_CMD) up -d
 	@echo "$(GREEN)✅ Services démarrés$(NC)"
 
-stop: ## Arrête tous les services
+stop: check-docker-compose ## Arrête tous les services
 	@echo "$(YELLOW)⏹️  Arrêt des services...$(NC)"
-	@docker-compose down
+	@$(DOCKER_COMPOSE_CMD) down
 	@echo "$(GREEN)✅ Services arrêtés$(NC)"
 
-restart: ## Redémarre tous les services
+restart: check-docker-compose ## Redémarre tous les services
 	@echo "$(YELLOW)🔄 Redémarrage des services...$(NC)"
-	@docker-compose restart
+	@$(DOCKER_COMPOSE_CMD) restart
 	@echo "$(GREEN)✅ Services redémarrés$(NC)"
 
-status: ## Affiche l'état des services
+status: check-docker-compose ## Affiche l'état des services
 	@echo "$(GREEN)📊 État des services:$(NC)"
-	@docker-compose ps
+	@$(DOCKER_COMPOSE_CMD) ps
 
-logs: ## Affiche les logs en temps réel
+logs: check-docker-compose ## Affiche les logs en temps réel
 	@echo "$(GREEN)📋 Logs des services (Ctrl+C pour quitter):$(NC)"
-	@docker-compose logs -f
+	@$(DOCKER_COMPOSE_CMD) logs -f
 
-build: ## Reconstruit les images Docker
+build: check-docker-compose ## Reconstruit les images Docker
 	@echo "$(GREEN)🔨 Construction des images...$(NC)"
-	@docker-compose build --no-cache
+	@$(DOCKER_COMPOSE_CMD) build --no-cache
 	@echo "$(GREEN)✅ Images construites$(NC)"
 
 rebuild: stop build start ## Arrête, reconstruit et redémarre tout
 
-update: ## Met à jour le projet depuis Git et redémarre
+update: check-docker-compose ## Met à jour le projet depuis Git et redémarre
 	@echo "$(GREEN)📥 Mise à jour du projet...$(NC)"
 	@git pull
-	@docker-compose down
-	@docker-compose build --no-cache
-	@docker-compose up -d
+	@$(DOCKER_COMPOSE_CMD) down
+	@$(DOCKER_COMPOSE_CMD) build --no-cache
+	@$(DOCKER_COMPOSE_CMD) up -d
 	@echo "$(GREEN)✅ Mise à jour terminée$(NC)"
 
-apps: ## Démarre les applications d'exemple (Sonarr, Radarr, etc.)
+apps: check-docker-compose ## Démarre les applications d'exemple (Sonarr, Radarr, etc.)
 	@echo "$(GREEN)🎬 Démarrage des applications d'exemple...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) -f $(APPS_COMPOSE_FILE) --profile apps up -d
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) -f $(APPS_COMPOSE_FILE) --profile apps up -d
 	@echo "$(GREEN)✅ Applications d'exemple démarrées$(NC)"
 
-apps-stop: ## Arrête les applications d'exemple
+apps-stop: check-docker-compose ## Arrête les applications d'exemple
 	@echo "$(YELLOW)⏹️  Arrêt des applications d'exemple...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) -f $(APPS_COMPOSE_FILE) --profile apps down
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) -f $(APPS_COMPOSE_FILE) --profile apps down
 	@echo "$(GREEN)✅ Applications d'exemple arrêtées$(NC)"
 
-dashboard: ## Démarre le dashboard d'administration
+dashboard: check-docker-compose ## Démarre le dashboard d'administration
 	@echo "$(GREEN)🎛️  Démarrage du dashboard...$(NC)"
-	@docker-compose --profile dashboard up -d
+	@$(DOCKER_COMPOSE_CMD) --profile dashboard up -d
 	@echo "$(GREEN)✅ Dashboard disponible sur http://localhost:3001$(NC)"
 
-dashboard-build: ## Reconstruit le dashboard
+dashboard-build: check-docker-compose ## Reconstruit le dashboard
 	@echo "$(GREEN)🔨 Construction du dashboard...$(NC)"
-	@docker-compose build frontend-dashboard
+	@$(DOCKER_COMPOSE_CMD) build frontend-dashboard
 	@echo "$(GREEN)✅ Dashboard reconstruit$(NC)"
 
-dashboard-logs: ## Affiche les logs du dashboard
-	@docker-compose logs -f frontend-dashboard
+dashboard-logs: check-docker-compose ## Affiche les logs du dashboard
+	@$(DOCKER_COMPOSE_CMD) logs -f frontend-dashboard
 
-dashboard-stop: ## Arrête le dashboard
-	@docker-compose --profile dashboard down
+dashboard-stop: check-docker-compose ## Arrête le dashboard
+	@$(DOCKER_COMPOSE_CMD) --profile dashboard down
 
 clean: ## Nettoie les ressources Docker inutilisées
 	@echo "$(YELLOW)🧹 Nettoyage des ressources Docker...$(NC)"
@@ -94,35 +116,35 @@ clean: ## Nettoie les ressources Docker inutilisées
 	@docker volume prune -f
 	@echo "$(GREEN)✅ Nettoyage terminé$(NC)"
 
-clean-all: ## Supprime TOUT (containers, images, volumes, réseaux)
+clean-all: check-docker-compose ## Supprime TOUT (containers, images, volumes, réseaux)
 	@echo "$(YELLOW)⚠️  ATTENTION: Cette action supprime TOUTES les données!$(NC)"
 	@echo "$(YELLOW)Appuyez sur Ctrl+C pour annuler, ou Entrée pour continuer...$(NC)"
 	@read
-	@docker-compose -f $(COMPOSE_FILE) -f $(APPS_COMPOSE_FILE) down -v --remove-orphans
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) -f $(APPS_COMPOSE_FILE) down -v --remove-orphans
 	@docker system prune -a -f --volumes
 	@echo "$(GREEN)✅ Suppression complète terminée$(NC)"
 
-dev: ## Mode développement avec rechargement automatique
+dev: check-docker-compose ## Mode développement avec rechargement automatique
 	@echo "$(GREEN)🛠️  Mode développement...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) -f docker-compose.dev.yml up --build
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) -f docker-compose.dev.yml up --build
 
-backup: ## Sauvegarde les volumes et la configuration
+backup: check-docker-compose ## Sauvegarde les volumes et la configuration
 	@echo "$(GREEN)💾 Sauvegarde en cours...$(NC)"
 	@mkdir -p backups
 	@docker run --rm -v selfstart_caddy_data:/data -v $(PWD)/backups:/backup alpine tar czf /backup/caddy_data_$(shell date +%Y%m%d_%H%M%S).tar.gz -C /data .
 	@cp .env backups/env_$(shell date +%Y%m%d_%H%M%S).backup 2>/dev/null || true
 	@echo "$(GREEN)✅ Sauvegarde terminée dans ./backups/$(NC)"
 
-test: ## Lance les tests (API et frontend)
+test: check-docker-compose ## Lance les tests (API et frontend)
 	@echo "$(GREEN)🧪 Lancement des tests...$(NC)"
-	@docker-compose exec backend-api python -m pytest tests/ || echo "Pas de tests backend configurés"
-	@docker-compose exec frontend-loader npm test || echo "Pas de tests frontend configurés"
+	@$(DOCKER_COMPOSE_CMD) exec backend-api python -m pytest tests/ || echo "Pas de tests backend configurés"
+	@$(DOCKER_COMPOSE_CMD) exec frontend-loader npm test || echo "Pas de tests frontend configurés"
 
-shell-backend: ## Ouvre un shell dans le container backend
-	@docker-compose exec backend-api /bin/bash
+shell-backend: check-docker-compose ## Ouvre un shell dans le container backend
+	@$(DOCKER_COMPOSE_CMD) exec backend-api /bin/bash
 
-shell-frontend: ## Ouvre un shell dans le container frontend
-	@docker-compose exec frontend-loader /bin/sh
+shell-frontend: check-docker-compose ## Ouvre un shell dans le container frontend
+	@$(DOCKER_COMPOSE_CMD) exec frontend-loader /bin/sh
 
 api-docs: ## Ouvre la documentation de l'API
 	@echo "$(GREEN)📚 Documentation API disponible sur:$(NC)"
@@ -170,14 +192,14 @@ env-check: ## Vérifie la configuration .env
 	fi
 
 # Règles pour les différents environnements
-prod: ## Déploiement en production
+prod: check-docker-compose ## Déploiement en production
 	@echo "$(GREEN)🚀 Déploiement en production...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) -f docker-compose.prod.yml up -d
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) -f docker-compose.prod.yml up -d
 	@echo "$(GREEN)✅ Déploiement en production terminé$(NC)"
 
-staging: ## Déploiement en staging
+staging: check-docker-compose ## Déploiement en staging
 	@echo "$(GREEN)🧪 Déploiement en staging...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) -f docker-compose.staging.yml up -d
+	@$(DOCKER_COMPOSE_CMD) -f $(COMPOSE_FILE) -f docker-compose.staging.yml up -d
 	@echo "$(GREEN)✅ Déploiement en staging terminé$(NC)"
 
 # Gestion des certificats SSL (pour la production)
