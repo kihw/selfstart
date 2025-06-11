@@ -18,7 +18,7 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-}
     networks:
-      - caddy_net
+      - selfstart-network
     depends_on:
       - backend-api
       - frontend-loader
@@ -43,7 +43,7 @@ services:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     networks:
-      - caddy_net
+      - selfstart-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -62,7 +62,7 @@ services:
       - VITE_API_URL=http://backend-api:8000
       - VITE_POLLING_INTERVAL=${POLLING_INTERVAL:-2000}
     networks:
-      - caddy_net
+      - selfstart-network
     depends_on:
       - backend-api
     healthcheck:
@@ -83,7 +83,7 @@ services:
       - VITE_API_URL=http://backend-api:8000
       - VITE_POLLING_INTERVAL=${POLLING_INTERVAL:-2000}
     networks:
-      - caddy_net
+      - selfstart-network
     depends_on:
       - backend-api
     profiles: ["dashboard"]
@@ -103,6 +103,6 @@ volumes:
 
 # Réseau pour la communication entre services
 networks:
-  caddy_net:
+  selfstart-network:
     driver: bridge
-    name: caddy_net
+    name: selfstart-network
