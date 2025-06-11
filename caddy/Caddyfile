@@ -50,68 +50,6 @@ sonarr.{$BASE_DOMAIN} {
     }
 }
 
-# Route pour Radarr
-radarr.{$BASE_DOMAIN} {
-    @running `curl -sf http://backend-api:8000/api/status?name=radarr | grep -o '"status":"running"'`
-    
-    handle @running {
-        reverse_proxy radarr:7878 {
-            header_up Host {host}
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-            timeout 30s
-        }
-    }
-    
-    handle {
-        reverse_proxy frontend-loader:3000 {
-            header_up X-Container-Name radarr
-            header_up X-Container-Port 7878
-            header_up Host {host}
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-        }
-    }
-    
-    log {
-        output file /var/log/caddy/radarr.log
-        level INFO
-    }
-}
-
-# Route pour Jellyfin
-jellyfin.{$BASE_DOMAIN} {
-    @running `curl -sf http://backend-api:8000/api/status?name=jellyfin | grep -o '"status":"running"'`
-    
-    handle @running {
-        reverse_proxy jellyfin:8096 {
-            header_up Host {host}
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-            timeout 30s
-        }
-    }
-    
-    handle {
-        reverse_proxy frontend-loader:3000 {
-            header_up X-Container-Name jellyfin
-            header_up X-Container-Port 8096
-            header_up Host {host}
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
-        }
-    }
-    
-    log {
-        output file /var/log/caddy/jellyfin.log
-        level INFO
-    }
-}
-
 # Dashboard d'administration
 admin.{$BASE_DOMAIN} {
     reverse_proxy frontend-dashboard:3000 {
@@ -177,5 +115,4 @@ handle_errors {
     handle @500 {
         respond "Erreur serveur - Contactez l'administrateur" 500
     }
-}
 }
